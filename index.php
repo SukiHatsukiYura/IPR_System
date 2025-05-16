@@ -13,7 +13,7 @@
 <body>
     <!-- 顶部导航栏 -->
     <div class="top-nav">
-        <div class="logo-area">            
+        <div class="logo-area">
             <div class="logo-text">鸿鼎知识产权系统</div>
         </div>
         <div class="nav-menu">
@@ -21,7 +21,7 @@
             <div class="nav-item">专利管理</div>
             <div class="nav-item">商标管理</div>
             <div class="nav-item">版权管理</div>
-            <div class="nav-item">交义管理</div>
+            <div class="nav-item">发文管理</div>
             <div class="nav-item">批量管理</div>
             <div class="nav-item">账款管理</div>
             <div class="nav-item">系统管理</div>
