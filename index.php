@@ -1,5 +1,10 @@
 <?php
+session_start();
 // 主框架逻辑部分
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -27,8 +32,8 @@
             <div class="nav-item">系统管理</div>
         </div>
         <div class="user-area">
-            <div class="phone-number">18028146647</div>
-            <div class="logout-btn">退出</div>
+            <div class="user-name"><?php echo isset($_SESSION['username']) ? htmlspecialchars($_SESSION['username']) : '未登录'; ?></div>
+            <a class="logout-btn" href="logout.php">退出</a>
         </div>
     </div>
 

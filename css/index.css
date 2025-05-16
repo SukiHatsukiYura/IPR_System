@@ -68,15 +68,24 @@ html {
     align-items: center;
 }
 
-.phone-number {
+.user-name {
     margin-right: 20px;
 }
 
-.logout-btn {
+.logout-btn,
+a.logout-btn {
     padding: 5px 10px;
     cursor: pointer;
     border-left: 1px solid rgba(255, 255, 255, 0.5);
     padding-left: 15px;
+    color: #fff;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.logout-btn:hover,
+a.logout-btn:hover {
+    color: #ffd700;
 }
 
 /* 主体内容区域 */
