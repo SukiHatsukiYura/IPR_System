@@ -13,6 +13,7 @@ if (!isset($_SESSION['user_id'])) {
     <meta charset="UTF-8">
     <title>鸿鼎知识产权系统</title>
     <link rel="stylesheet" href="css/index.css">
+    <link rel="stylesheet" href="css/module.css">
 </head>
 
 <body>

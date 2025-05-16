@@ -114,32 +114,32 @@ function show_bool($v)
     return $v ? '是' : '否';
 }
 ?>
-<div class="user-basic-info-panel">
-    <div class="panel-btns">
+<div class="module-panel">
+    <div class="module-btns">
         <button type="button" class="btn-edit"><i class="icon-edit"></i> 修改</button>
         <button type="button" class="btn-save" style="display:none"><i class="icon-save"></i> 保存</button>
         <button type="button" class="btn-cancel" style="display:none"><i class="icon-cancel"></i> 取消</button>
     </div>
-    <form class="info-form" autocomplete="off">
-        <table class="info-table-grid">
+    <form class="module-form" autocomplete="off">
+        <table class="module-table">
             <tr>
-                <td class="label req">*用户名：</td>
-                <td><input type="text" name="username" class="info-input" value="<?= show_val($user['username']) ?>" readonly></td>
-                <td class="label">工号：</td>
-                <td><input type="text" name="job_number" class="info-input" value="<?= show_val($user['job_number']) ?>" readonly></td>
+                <td class="module-label module-req">*用户名：</td>
+                <td><input type="text" name="username" class="module-input" value="<?= show_val($user['username']) ?>" readonly></td>
+                <td class="module-label">工号：</td>
+                <td><input type="text" name="job_number" class="module-input" value="<?= show_val($user['job_number']) ?>" readonly></td>
             </tr>
             <tr>
-                <td class="label req">*姓名：</td>
-                <td><input type="text" name="real_name" class="info-input" value="<?= show_val($user['real_name']) ?>" readonly></td>
-                <td class="label req">*邮箱：</td>
-                <td><input type="email" name="email" class="info-input" value="<?= show_val($user['email']) ?>" readonly></td>
+                <td class="module-label module-req">*姓名：</td>
+                <td><input type="text" name="real_name" class="module-input" value="<?= show_val($user['real_name']) ?>" readonly></td>
+                <td class="module-label module-req">*邮箱：</td>
+                <td><input type="email" name="email" class="module-input" value="<?= show_val($user['email']) ?>" readonly></td>
             </tr>
             <tr>
-                <td class="label">英文名：</td>
-                <td><input type="text" name="english_name" class="info-input" value="<?= show_val($user['english_name']) ?>" readonly></td>
-                <td class="label">性别：</td>
+                <td class="module-label">英文名：</td>
+                <td><input type="text" name="english_name" class="module-input" value="<?= show_val($user['english_name']) ?>" readonly></td>
+                <td class="module-label">性别：</td>
                 <td>
-                    <select name="gender" class="info-input" disabled>
+                    <select name="gender" class="module-input" disabled>
                         <option value="">请选择</option>
                         <option value="1" <?= $user['gender'] == '1' ? 'selected' : '' ?>>男</option>
                         <option value="0" <?= $user['gender'] == '0' ? 'selected' : '' ?>>女</option>
@@ -147,71 +147,71 @@ function show_bool($v)
                 </td>
             </tr>
             <tr>
-                <td class="label">电话：</td>
-                <td><input type="text" name="phone" class="info-input" value="<?= show_val($user['phone']) ?>" readonly></td>
-                <td class="label">手机：</td>
-                <td><input type="text" name="mobile" class="info-input" value="<?= show_val($user['mobile']) ?>" readonly></td>
+                <td class="module-label">电话：</td>
+                <td><input type="text" name="phone" class="module-input" value="<?= show_val($user['phone']) ?>" readonly></td>
+                <td class="module-label">手机：</td>
+                <td><input type="text" name="mobile" class="module-input" value="<?= show_val($user['mobile']) ?>" readonly></td>
             </tr>
             <tr>
-                <td class="label">出生日期：</td>
-                <td><input type="date" name="birthday" class="info-input" value="<?= show_val($user['birthday']) ?>" readonly></td>
-                <td class="label">是否在职：</td>
+                <td class="module-label">出生日期：</td>
+                <td><input type="date" name="birthday" class="module-input" value="<?= show_val($user['birthday']) ?>" readonly></td>
+                <td class="module-label">是否在职：</td>
                 <td>
-                    <select name="is_active" class="info-input" disabled>
+                    <select name="is_active" class="module-input" disabled>
                         <option value="1" <?= $user['is_active'] == '1' ? 'selected' : '' ?>>是</option>
                         <option value="0" <?= $user['is_active'] == '0' ? 'selected' : '' ?>>否</option>
                     </select>
                 </td>
             </tr>
             <tr>
-                <td class="label">专业：</td>
-                <td><input type="text" name="major" class="info-input" value="<?= show_val($user['major']) ?>" readonly></td>
-                <td class="label">创建时间：</td>
-                <td><input type="text" class="info-input" value="<?= show_val($user['created_at']) ?>" readonly disabled></td>
+                <td class="module-label">专业：</td>
+                <td><input type="text" name="major" class="module-input" value="<?= show_val($user['major']) ?>" readonly></td>
+                <td class="module-label">创建时间：</td>
+                <td><input type="text" class="module-input" value="<?= show_val($user['created_at']) ?>" readonly disabled></td>
             </tr>
             <tr>
-                <td class="label">更新用户：</td>
-                <td><input type="text" name="updated_by" class="info-input" value="<?= show_val($user['updated_by']) ?>" readonly></td>
-                <td class="label">更新时间：</td>
-                <td><input type="text" class="info-input" value="<?= show_val($user['updated_at']) ?>" readonly disabled></td>
+                <td class="module-label">更新用户：</td>
+                <td><input type="text" name="updated_by" class="module-input" value="<?= show_val($user['updated_by']) ?>" readonly></td>
+                <td class="module-label">更新时间：</td>
+                <td><input type="text" class="module-input" value="<?= show_val($user['updated_at']) ?>" readonly disabled></td>
             </tr>
             <tr>
-                <td class="label">联系地址：</td>
-                <td><input type="text" name="address" class="info-input" value="<?= show_val($user['address']) ?>" readonly></td>
-                <td class="label">工作地：</td>
-                <td><input type="text" name="workplace" class="info-input" value="<?= show_val($user['workplace']) ?>" readonly></td>
+                <td class="module-label">联系地址：</td>
+                <td><input type="text" name="address" class="module-input" value="<?= show_val($user['address']) ?>" readonly></td>
+                <td class="module-label">工作地：</td>
+                <td><input type="text" name="workplace" class="module-input" value="<?= show_val($user['workplace']) ?>" readonly></td>
             </tr>
             <tr>
-                <td class="label req">*是否分代理人：</td>
+                <td class="module-label module-req">*是否分代理人：</td>
                 <td>
-                    <select name="is_agent" class="info-input" disabled>
+                    <select name="is_agent" class="module-input" disabled>
                         <option value="">请选择</option>
                         <option value="1" <?= $user['is_agent'] == '1' ? 'selected' : '' ?>>是</option>
                         <option value="0" <?= $user['is_agent'] == '0' ? 'selected' : '' ?>>否</option>
                     </select>
                 </td>
-                <td class="label">用户角色：</td>
-                <td><input type="text" name="role_name" class="info-input" value="<?= show_val($user['role_name']) ?>" readonly disabled></td>
+                <td class="module-label">用户角色：</td>
+                <td><input type="text" name="role_name" class="module-input" value="<?= show_val($user['role_name']) ?>" readonly disabled></td>
             </tr>
             <tr>
-                <td class="label">部门信息：</td>
-                <td colspan="3"><textarea name="department_info" class="info-textarea" readonly><?= show_val($user['department_info']) ?></textarea></td>
+                <td class="module-label">部门信息：</td>
+                <td colspan="3"><textarea name="department_info" class="module-textarea" readonly><?= show_val($user['department_info']) ?></textarea></td>
             </tr>
             <tr>
-                <td class="label">备注：</td>
-                <td colspan="3"><textarea name="remark" class="info-textarea" readonly><?= show_val($user['remark']) ?></textarea></td>
+                <td class="module-label">备注：</td>
+                <td colspan="3"><textarea name="remark" class="module-textarea" readonly><?= show_val($user['remark']) ?></textarea></td>
             </tr>
         </table>
     </form>
 </div>
 <script>
     (function() {
-        var form = document.querySelector('.info-form');
+        var form = document.querySelector('.module-form');
         var btnEdit = document.querySelector('.btn-edit');
         var btnSave = document.querySelector('.btn-save');
         var btnCancel = document.querySelector('.btn-cancel');
-        var inputs = form.querySelectorAll('.info-input, .info-textarea');
-        var selects = form.querySelectorAll('select.info-input');
+        var inputs = form.querySelectorAll('.module-input, .module-textarea');
+        var selects = form.querySelectorAll('select.module-input');
         var orig = {};
         // 缓存原始值
         function cacheOrig() {
@@ -232,7 +232,7 @@ function show_bool($v)
             selects.forEach(function(sel) {
                 sel.disabled = !edit;
             });
-            form.querySelectorAll('.info-textarea').forEach(function(ta) {
+            form.querySelectorAll('.module-textarea').forEach(function(ta) {
                 ta.readOnly = !edit;
             });
             btnEdit.style.display = edit ? 'none' : '';
@@ -314,136 +314,4 @@ function show_bool($v)
         };
     })();
 </script>
-<style>
-    .user-basic-info-panel {
-        background: #fff;
-        border-radius: 4px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-        padding: 18px 24px 24px 24px;
-        margin: 18px;
-        min-width: 900px;
-        max-width: 1100px;
-    }
-
-    .panel-btns {
-        margin-bottom: 10px;
-    }
-
-    .panel-btns button {
-        background: #f5f5f5;
-        border: 1px solid #d0d0d0;
-        border-radius: 3px;
-        color: #333;
-        font-size: 14px;
-        padding: 4px 18px;
-        margin-right: 8px;
-        cursor: pointer;
-        transition: background 0.2s;
-    }
-
-    .panel-btns button:hover {
-        background: #e0e0e0;
-    }
-
-    .icon-edit::before {
-        content: '\270E';
-        margin-right: 4px;
-    }
-
-    .icon-save::before {
-        content: '\2714';
-        margin-right: 4px;
-    }
-
-    .icon-cancel::before {
-        content: '\2716';
-        margin-right: 4px;
-    }
-
-    .info-table-grid {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        border: 1px solid #e0e0e0;
-        background: #fafbfc;
-    }
-
-    .info-table-grid tr {
-        border-bottom: 1px solid #e0e0e0;
-    }
-
-    .info-table-grid td {
-        border-right: 1px solid #e0e0e0;
-        border-bottom: 1px solid #e0e0e0;
-        padding: 6px 10px;
-        font-size: 15px;
-        background: #fafbfc;
-    }
-
-    .info-table-grid td:last-child {
-        border-right: none;
-    }
-
-    .info-table-grid tr:last-child td {
-        border-bottom: none;
-    }
-
-    .label {
-        color: #666;
-        text-align: right;
-        width: 120px;
-        min-width: 90px;
-        font-size: 14px;
-        background: #f3f6fa;
-    }
-
-    .req::before {
-        content: '*';
-        color: #f44336;
-        margin-right: 2px;
-    }
-
-    .info-input {
-        width: 100%;
-        background: #f3f3f3;
-        border: 1px solid #e0e0e0;
-        border-radius: 3px;
-        padding: 5px 8px;
-        font-size: 15px;
-        color: #333;
-        outline: none;
-        box-sizing: border-box;
-    }
-
-    .info-input[readonly],
-    .info-input:disabled {
-        color: #888;
-        background: #f3f3f3;
-        cursor: default;
-    }
-
-    .info-form.editing .info-input:not([readonly]):not(:disabled),
-    .info-form.editing .info-textarea:not([readonly]) {
-        background: #fff;
-        border: 1px solid #29b6b0;
-    }
-
-    .info-textarea {
-        width: 100%;
-        min-height: 38px;
-        background: #f3f3f3;
-        border: 1px solid #e0e0e0;
-        border-radius: 3px;
-        padding: 5px 8px;
-        font-size: 15px;
-        color: #333;
-        resize: vertical;
-        box-sizing: border-box;
-    }
-
-    .info-textarea[readonly] {
-        color: #888;
-        background: #f3f3f3;
-        cursor: default;
-    }
-</style>
+<!-- <link rel="stylesheet" href="../../../css/module.css"> -->

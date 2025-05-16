@@ -1,0 +1,167 @@
+/* 通用面板容器 */
+.module-panel {
+    background: #fff;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    padding: 18px 24px 24px 24px;
+    margin: 18px;
+    min-width: 900px;
+    max-width: 1100px;
+}
+
+/* 按钮区 */
+.module-btns {
+    margin-bottom: 10px;
+}
+
+.module-btns button {
+    background: #f5f5f5;
+    border: 1px solid #d0d0d0;
+    border-radius: 3px;
+    color: #333;
+    font-size: 14px;
+    padding: 4px 18px;
+    margin-right: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.module-btns button:disabled {
+    background: #eee;
+    color: #aaa;
+    cursor: not-allowed;
+}
+
+.module-btns button:hover:not(:disabled) {
+    background: #e0e0e0;
+}
+
+.icon-edit::before {
+    content: '\270E';
+    margin-right: 4px;
+}
+
+.icon-save::before {
+    content: '\2714';
+    margin-right: 4px;
+}
+
+.icon-cancel::before {
+    content: '\2716';
+    margin-right: 4px;
+}
+
+/* 通用表格 */
+.module-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid #e0e0e0;
+    background: #fafbfc;
+}
+
+.module-table tr {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.module-table td {
+    border-right: 1px solid #e0e0e0;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 6px 10px;
+    font-size: 15px;
+    background: #fafbfc;
+}
+
+.module-table td:last-child {
+    border-right: none;
+}
+
+.module-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* 标签和必填星号 */
+.module-label {
+    color: #666;
+    text-align: right;
+    width: 120px;
+    min-width: 90px;
+    font-size: 14px;
+    background: #f3f6fa;
+}
+
+.module-req::before {
+    content: '*';
+    color: #f44336;
+    margin-right: 2px;
+}
+
+/* 通用输入框/下拉/文本域 */
+.module-input {
+    width: 100%;
+    background: #f3f3f3;
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 15px;
+    color: #333;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.module-input[readonly],
+.module-input:disabled {
+    color: #888;
+    background: #f3f3f3;
+    cursor: default;
+}
+
+.module-form.editing .module-input:not([readonly]):not(:disabled),
+.module-form.editing .module-textarea:not([readonly]) {
+    background: #fff;
+    border: 1px solid #29b6b0;
+}
+
+.module-textarea {
+    width: 100%;
+    min-height: 38px;
+    background: #f3f3f3;
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 15px;
+    color: #333;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.module-textarea[readonly] {
+    color: #888;
+    background: #f3f3f3;
+    cursor: default;
+}
+
+/* mini按钮 */
+.btn-mini {
+    background: #e0e0e0;
+    border: 1px solid #bbb;
+    border-radius: 2px;
+    color: #333;
+    font-size: 13px;
+    padding: 2px 10px;
+    margin: 0 2px;
+    cursor: pointer;
+}
+
+.btn-mini:hover {
+    background: #d0d0d0;
+}
+
+/* 选中高亮 */
+.module-selected {
+    background: #e0f7fa !important;
+}
+
+.module-table tr.module-selected td {
+    background: #e0f7fa !important;
+}

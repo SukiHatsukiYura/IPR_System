@@ -107,15 +107,15 @@ $stmt = $pdo->prepare('SELECT * FROM user_email_account WHERE user_id=? ORDER BY
 $stmt->execute([$user_id]);
 $email_accounts = $stmt->fetchAll();
 ?>
-<div class="user-basic-info-panel">
-    <div class="panel-btns">
+<div class="module-panel">
+    <div class="module-btns">
         <button type="button" class="btn-new"><i class="icon-edit"></i> 新建</button>
         <button type="button" class="btn-edit" disabled><i class="icon-edit"></i> 修改</button>
         <button type="button" class="btn-delete" disabled><i class="icon-cancel"></i> 删除</button>
         <button type="button" class="btn-test" disabled><i class="icon-save"></i> 测试发信</button>
     </div>
     <div class="email-list-area">
-        <table class="info-table-grid">
+        <table class="module-table">
             <tr>
                 <td>收信服务器(IMAP)</td>
                 <td>收信端口</td>
@@ -143,41 +143,41 @@ $email_accounts = $stmt->fetchAll();
             <?php endif; ?>
         </table>
     </div>
-    <form class="info-form" autocomplete="off" style="margin-top:18px;display:none;">
+    <form class="module-form" autocomplete="off" style="margin-top:18px;display:none;">
         <input type="hidden" name="id" value="">
-        <table class="info-table-grid">
+        <table class="module-table">
             <tr>
-                <td class="label req">*收信服务器(IMAP)：</td>
-                <td><input type="text" name="imap_server" class="info-input"></td>
-                <td class="label req">*收信端口(IMAP)：</td>
-                <td><input type="text" name="imap_port" class="info-input"></td>
+                <td class="module-label module-req">*收信服务器(IMAP)：</td>
+                <td><input type="text" name="imap_server" class="module-input"></td>
+                <td class="module-label module-req">*收信端口(IMAP)：</td>
+                <td><input type="text" name="imap_port" class="module-input"></td>
             </tr>
             <tr>
-                <td class="label req">*发信服务器(SMTP)：</td>
-                <td><input type="text" name="smtp_server" class="info-input"></td>
-                <td class="label req">*发信端口(SMTP)：</td>
-                <td><input type="text" name="smtp_port" class="info-input"></td>
+                <td class="module-label module-req">*发信服务器(SMTP)：</td>
+                <td><input type="text" name="smtp_server" class="module-input"></td>
+                <td class="module-label module-req">*发信端口(SMTP)：</td>
+                <td><input type="text" name="smtp_port" class="module-input"></td>
             </tr>
             <tr>
-                <td class="label req">*收信地址：</td>
-                <td><input type="email" name="receive_email" class="info-input"></td>
-                <td class="label req">*发信地址：</td>
-                <td><input type="email" name="send_email" class="info-input"></td>
+                <td class="module-label module-req">*收信地址：</td>
+                <td><input type="email" name="receive_email" class="module-input"></td>
+                <td class="module-label module-req">*发信地址：</td>
+                <td><input type="email" name="send_email" class="module-input"></td>
             </tr>
             <tr>
-                <td class="label req">*邮箱密码：</td>
-                <td><input type="password" name="imap_password" class="info-input"></td>
-                <td class="label req">*发信密码：</td>
-                <td><input type="password" name="smtp_password" class="info-input"></td>
+                <td class="module-label module-req">*邮箱密码：</td>
+                <td><input type="password" name="imap_password" class="module-input"></td>
+                <td class="module-label module-req">*发信密码：</td>
+                <td><input type="password" name="smtp_password" class="module-input"></td>
             </tr>
             <tr>
-                <td class="label">是否默认发件邮箱：</td>
-                <td><select name="is_default" class="info-input">
+                <td class="module-label">是否默认发件邮箱：</td>
+                <td><select name="is_default" class="module-input">
                         <option value="0">否</option>
                         <option value="1">是</option>
                     </select></td>
-                <td class="label">个性签名：</td>
-                <td colspan="1"><textarea name="signature" class="info-input" style="height:60px;"></textarea></td>
+                <td class="module-label">个性签名：</td>
+                <td colspan="1"><textarea name="signature" class="module-input" style="height:60px;"></textarea></td>
             </tr>
         </table>
         <div style="margin-top:12px;text-align:right;">
@@ -189,7 +189,7 @@ $email_accounts = $stmt->fetchAll();
 <script>
     (function() {
         var listArea = document.querySelector('.email-list-area');
-        var form = document.querySelector('.info-form');
+        var form = document.querySelector('.module-form');
         var btnNew = document.querySelector('.btn-new');
         var btnEdit = document.querySelector('.btn-edit');
         var btnDelete = document.querySelector('.btn-delete');
@@ -203,9 +203,9 @@ $email_accounts = $stmt->fetchAll();
             if (!tr) return;
             // 取消所有高亮
             listArea.querySelectorAll('tr[data-id]').forEach(function(row) {
-                row.classList.remove('selected');
+                row.classList.remove('module-selected');
             });
-            tr.classList.add('selected');
+            tr.classList.add('module-selected');
             selectedId = tr.getAttribute('data-id');
             btnEdit.disabled = false;
             btnDelete.disabled = false;
@@ -256,7 +256,7 @@ $email_accounts = $stmt->fetchAll();
             btnTest.disabled = true;
             // 取消表格高亮
             listArea.querySelectorAll('tr[data-id]').forEach(function(row) {
-                row.classList.remove('selected');
+                row.classList.remove('module-selected');
             });
         };
         // 修改
@@ -404,7 +404,7 @@ $email_accounts = $stmt->fetchAll();
             btnTest.disabled = true;
             // 取消表格高亮
             listArea.querySelectorAll('tr[data-id]').forEach(function(row) {
-                row.classList.remove('selected');
+                row.classList.remove('module-selected');
             });
         };
         // 测试发信（预留）
@@ -415,7 +415,7 @@ $email_accounts = $stmt->fetchAll();
         // 工具函数：HTML转义
         function escapeHtml(str) {
             if (str == null) return '';
-            return String(str).replace(/[&<>"]|'/g, function(s) {
+            return String(str).replace(/[&<>"]|' /g, function(s) {
                 return {
                     '&': '&amp;',
                     '<': '&lt;',
@@ -427,145 +427,3 @@ $email_accounts = $stmt->fetchAll();
         }
     })();
 </script>
-<style>
-    .user-basic-info-panel {
-        background: #fff;
-        border-radius: 4px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-        padding: 18px 24px 24px 24px;
-        margin: 18px;
-        min-width: 900px;
-        max-width: 1100px;
-    }
-
-    .panel-btns {
-        margin-bottom: 10px;
-    }
-
-    .panel-btns button {
-        background: #f5f5f5;
-        border: 1px solid #d0d0d0;
-        border-radius: 3px;
-        color: #333;
-        font-size: 14px;
-        padding: 4px 18px;
-        margin-right: 8px;
-        cursor: pointer;
-        transition: background 0.2s;
-    }
-
-    .panel-btns button:disabled {
-        background: #eee;
-        color: #aaa;
-        cursor: not-allowed;
-    }
-
-    .panel-btns button:hover:not(:disabled) {
-        background: #e0e0e0;
-    }
-
-    .icon-edit::before {
-        content: '\270E';
-        margin-right: 4px;
-    }
-
-    .icon-save::before {
-        content: '\2714';
-        margin-right: 4px;
-    }
-
-    .icon-cancel::before {
-        content: '\2716';
-        margin-right: 4px;
-    }
-
-    .info-table-grid {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        border: 1px solid #e0e0e0;
-        background: #fafbfc;
-    }
-
-    .info-table-grid tr {
-        border-bottom: 1px solid #e0e0e0;
-    }
-
-    .info-table-grid td {
-        border-right: 1px solid #e0e0e0;
-        border-bottom: 1px solid #e0e0e0;
-        padding: 6px 10px;
-        font-size: 15px;
-        background: #fafbfc;
-    }
-
-    .info-table-grid td:last-child {
-        border-right: none;
-    }
-
-    .info-table-grid tr:last-child td {
-        border-bottom: none;
-    }
-
-    .label {
-        color: #666;
-        text-align: right;
-        width: 120px;
-        min-width: 90px;
-        font-size: 14px;
-        background: #f3f6fa;
-    }
-
-    .req::before {
-        content: '*';
-        color: #f44336;
-        margin-right: 2px;
-    }
-
-    .info-input {
-        width: 100%;
-        background: #f3f3f3;
-        border: 1px solid #e0e0e0;
-        border-radius: 3px;
-        padding: 5px 8px;
-        font-size: 15px;
-        color: #333;
-        outline: none;
-        box-sizing: border-box;
-    }
-
-    .info-input[readonly],
-    .info-input:disabled {
-        color: #888;
-        background: #f3f3f3;
-        cursor: default;
-    }
-
-    .info-form.editing .info-input:not([readonly]):not(:disabled) {
-        background: #fff;
-        border: 1px solid #29b6b0;
-    }
-
-    .btn-mini {
-        background: #e0e0e0;
-        border: 1px solid #bbb;
-        border-radius: 2px;
-        color: #333;
-        font-size: 13px;
-        padding: 2px 10px;
-        margin: 0 2px;
-        cursor: pointer;
-    }
-
-    .btn-mini:hover {
-        background: #d0d0d0;
-    }
-
-    .selected {
-        background: #e0f7fa !important;
-    }
-
-    .info-table-grid tr.selected td {
-        background: #e0f7fa !important;
-    }
-</style>
