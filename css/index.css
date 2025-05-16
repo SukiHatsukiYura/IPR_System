@@ -1,0 +1,377 @@
+body,
+html {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f5f5f5;
+    height: 100%;
+}
+
+/* 顶部导航栏 */
+.top-nav {
+    background-color: #29b6b0;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    color: white;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+}
+
+.logo-img {
+    width: 40px;
+    height: 40px;
+}
+
+.logo-text {
+    font-size: 20px;
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+.nav-menu {
+    margin-left: 50px;
+    display: flex;
+    flex: 1;
+}
+
+.nav-item {
+    padding: 0 15px;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-item.active {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.user-area {
+    display: flex;
+    align-items: center;
+}
+
+.phone-number {
+    margin-right: 20px;
+}
+
+.logout-btn {
+    padding: 5px 10px;
+    cursor: pointer;
+    border-left: 1px solid rgba(255, 255, 255, 0.5);
+    padding-left: 15px;
+}
+
+/* 主体内容区域 */
+.main-container {
+    display: flex;
+    height: calc(100% - 60px);
+}
+
+/* 左侧边栏 */
+.sidebar {
+    width: 180px;
+    background-color: white;
+    border-right: 1px solid #e0e0e0;
+}
+
+.sidebar-menu {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.menu-item {
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    color: #333;
+    font-size: 15px;
+    border-bottom: 1px solid #f0f0f0;
+    position: relative;
+}
+
+.menu-item.active {
+    background-color: #29b6b0;
+    color: white;
+}
+
+.menu-item i {
+    margin-right: 10px;
+    font-size: 18px;
+}
+
+.menu-item .arrow {
+    position: absolute;
+    right: 15px;
+    transition: transform 0.3s;
+}
+
+.menu-item.open .arrow {
+    transform: rotate(90deg);
+}
+
+.sub-menu {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    background-color: #f9f9f9;
+    display: none;
+}
+
+.menu-item.active+.sub-menu {
+    display: block;
+}
+
+.menu-item.open+.sub-menu {
+    display: block;
+}
+
+.sub-menu-item {
+    padding: 12px 0 12px 40px;
+    font-size: 14px;
+    color: #666;
+    cursor: pointer;
+}
+
+.sub-menu-item:hover {
+    background-color: #f0f0f0;
+}
+
+.sub-menu-item.active {
+    color: #29b6b0;
+    font-weight: bold;
+}
+
+/* 右侧内容区域 */
+.content-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+
+/* 通知栏 */
+.notification-bar {
+    background-color: #f9f9f9;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 13px;
+    color: #666;
+}
+
+.notification-icon {
+    margin-right: 10px;
+    font-size: 16px;
+}
+
+.highlight {
+    color: #f44336;
+}
+
+/* 主页面内容 */
+.homepage {
+    padding: 15px;
+}
+
+/* 菜单 */
+.menu-bar {
+    background-color: #f0f0f0;
+    padding: 10px 15px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.menu-bar a {
+    color: #666;
+    text-decoration: none;
+    padding: 5px 10px;
+}
+
+.menu-bar a.active {
+    background-color: white;
+    color: #29b6b0;
+}
+
+/* 面板样式 */
+.panel {
+    background-color: white;
+    margin-bottom: 15px;
+    border-radius: 3px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.panel-header {
+    padding: 10px 15px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.panel-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: normal;
+    color: #333;
+    display: flex;
+    align-items: center;
+}
+
+.panel-title i {
+    margin-right: 5px;
+}
+
+.panel-content {
+    padding: 15px;
+}
+
+.panel-empty {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+}
+
+/* 任务卡片容器 */
+.task-cards {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    padding: 10px 0;
+}
+
+/* 任务卡片 */
+.task-card {
+    text-align: center;
+    width: 120px;
+    margin-bottom: 15px;
+}
+
+.task-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto 10px;
+    color: white;
+    font-size: 20px;
+}
+
+.task-name {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.task-count {
+    font-size: 12px;
+    color: #666;
+}
+
+/* 图标颜色 */
+.orange {
+    background-color: #ff9800;
+}
+
+.orange-dark {
+    background-color: #f57c00;
+}
+
+.red {
+    background-color: #f44336;
+}
+
+.purple {
+    background-color: #9c27b0;
+}
+
+.green {
+    background-color: #4caf50;
+}
+
+.blue {
+    background-color: #2196f3;
+}
+
+/* 右侧帮助面板 */
+.help-panel {
+    position: fixed;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: #29b6b0;
+    color: white;
+    padding: 15px 10px;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    letter-spacing: 5px;
+    font-size: 14px;
+    border-radius: 5px 0 0 5px;
+    box-shadow: -1px 0 5px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+}
+
+/* 常用功能按钮 */
+.quick-function {
+    position: fixed;
+    right: 20px;
+    bottom: 100px;
+    width: 120px;
+    height: 40px;
+    background-color: #e57373;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+}
+
+/* 底部版权信息 */
+.footer {
+    background-color: #f9f9f9;
+    padding: 10px 0;
+    text-align: center;
+    font-size: 12px;
+    color: #999;
+    border-top: 1px solid #e0e0e0;
+}
+
+.footer a {
+    color: #666;
+    text-decoration: none;
+    margin: 0 10px;
+}
+
+/* 右侧功能区域 */
+.right-functions {
+    position: fixed;
+    right: 0;
+    top: 200px;
+    background-color: #29b6b0;
+    color: white;
+    border-radius: 5px 0 0 5px;
+    overflow: hidden;
+}
+
+.function-item {
+    padding: 10px 5px;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    letter-spacing: 2px;
+    font-size: 14px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
