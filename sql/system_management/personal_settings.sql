@@ -45,3 +45,23 @@ CREATE TABLE `user` (
 -- 初始用户
 -- 用户名：admin 密码：admin，角色：admin，邮箱：admin@admin.com，使用MD5加密
 INSERT INTO `user` (`username`, `password`, `real_name`, `role_id`, `email`) VALUES ('admin', MD5('admin'), '系统管理员', 1, 'admin@admin.com');
+
+-- 用户邮箱账户设置表
+CREATE TABLE `user_email_account` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `user_id` INT(11) NOT NULL COMMENT '用户ID',
+    `imap_server` VARCHAR(100) NOT NULL COMMENT '收信服务器(IMAP)',
+    `imap_port` INT(5) NOT NULL DEFAULT 993 COMMENT '收信端口(IMAP)',
+    `smtp_server` VARCHAR(100) NOT NULL COMMENT '发信服务器(SMTP)',
+    `smtp_port` INT(5) NOT NULL DEFAULT 465 COMMENT '发信端口(SMTP)',
+    `is_default` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否默认发件邮箱',
+    `receive_email` VARCHAR(100) NOT NULL COMMENT '收信地址',
+    `send_email` VARCHAR(100) NOT NULL COMMENT '发信地址',
+    `imap_password` VARCHAR(200) NOT NULL COMMENT '收信密码',
+    `smtp_password` VARCHAR(200) NOT NULL COMMENT '发信密码',
+    `signature` TEXT COMMENT '个性签名',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '用户邮箱账户设置';

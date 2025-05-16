@@ -11,7 +11,7 @@ if (!isset($_SESSION['user_id'])) {
 
 <head>
     <meta charset="UTF-8">
-    <title>鸿鼎知识产权系统 - 首页</title>
+    <title>鸿鼎知识产权系统</title>
     <link rel="stylesheet" href="css/index.css">
 </head>
 
@@ -384,13 +384,54 @@ if (!isset($_SESSION['user_id'])) {
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
-                        contentArea.innerHTML = xhr.responseText;
+                        // 自动执行<script>标签内容
+                        insertHtmlWithScripts(contentArea, xhr.responseText);
                     } else {
                         contentArea.innerHTML = '<div style="padding:40px;text-align:center;color:#f00;">页面加载失败：' + path + '</div>';
                     }
                 }
             };
             xhr.send();
+        }
+
+        // 加载首页内容
+        function loadHomePage() {
+            const contentArea = document.querySelector('.content-area');
+            contentArea.innerHTML = '<div style="padding:40px;text-align:center;color:#888;">正在加载...</div>';
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', 'home.php', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        insertHtmlWithScripts(contentArea, xhr.responseText);
+                        // 修正：加载完后主动初始化首页折叠功能
+                        if (typeof window.initHomeCollapse === 'function') {
+                            window.initHomeCollapse();
+                        }
+                    } else {
+                        contentArea.innerHTML = '<div style="padding:40px;text-align:center;color:#f00;">首页加载失败</div>';
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        // 工具函数：插入HTML并自动执行其中的<script>标签
+        function insertHtmlWithScripts(container, html) {
+            container.innerHTML = html;
+            // 提取并执行所有<script>
+            const scripts = Array.from(container.querySelectorAll('script'));
+            scripts.forEach(script => {
+                const newScript = document.createElement('script');
+                if (script.src) {
+                    newScript.src = script.src;
+                } else {
+                    newScript.text = script.textContent;
+                }
+                document.body.appendChild(newScript);
+                // 可选：移除原有script标签，避免重复
+                script.parentNode.removeChild(script);
+            });
         }
 
         // 生成tab唯一id
@@ -512,28 +553,6 @@ if (!isset($_SESSION['user_id'])) {
                 closeAllBtn.addEventListener('click', closeAllTabs);
                 tabBar.appendChild(closeAllBtn);
             }
-        }
-
-        // 加载首页内容
-        function loadHomePage() {
-            const contentArea = document.querySelector('.content-area');
-            contentArea.innerHTML = '<div style="padding:40px;text-align:center;color:#888;">正在加载...</div>';
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', 'home.php', true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        contentArea.innerHTML = xhr.responseText;
-                        // 修正：加载完后主动初始化首页折叠功能
-                        if (typeof window.initHomeCollapse === 'function') {
-                            window.initHomeCollapse();
-                        }
-                    } else {
-                        contentArea.innerHTML = '<div style="padding:40px;text-align:center;color:#f00;">首页加载失败</div>';
-                    }
-                }
-            };
-            xhr.send();
         }
 
         // 修改左侧菜单点击逻辑，打开tab
