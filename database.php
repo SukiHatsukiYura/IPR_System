@@ -22,3 +22,43 @@ try {
     // 生产环境可隐藏详细信息
     die('数据库连接失败: ' . $e->getMessage());
 }
+// 禁止直接访问
+if (!function_exists('check_access_via_framework')) {
+    /**
+     * 检查是否通过框架访问
+     * 如果通过框架访问，则不进行任何操作
+     * 如果未通过框架访问，则输出禁止直接访问的HTML
+     */
+    function check_access_via_framework()
+    {
+        if (!isset($_SERVER['HTTP_REFERER']) || strpos($_SERVER['HTTP_REFERER'], 'index.php') === false) {
+            // 输出完整HTML，保证body存在
+            echo '<!DOCTYPE html>
+                    <html lang="zh-CN">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>禁止直接访问</title>
+                        <style>
+                            body { display:flex; align-items:center; justify-content:center; height:100vh; font-size:22px; color:#f44336; background:#fff; flex-direction:column; }
+                        </style>
+                    </head>
+                    <body>
+                        <div>禁止直接访问此页面，请通过系统主界面进入！<br>3秒后返回首页...</div>
+                        <script>
+                            setTimeout(function() {
+                                var path = window.location.pathname;
+                                var idx = path.indexOf("/modules/");
+                                if (idx !== -1) {
+                                    var root = path.substring(0, idx);
+                                    window.top.location.href = root + "/index.php";
+                                } else {
+                                    window.top.location.href = "/index.php";
+                                }
+                            }, 3000);
+                        </script>
+                    </body>
+                    </html>';
+            exit;
+        }
+    }
+}

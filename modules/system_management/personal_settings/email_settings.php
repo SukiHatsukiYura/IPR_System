@@ -2,6 +2,7 @@
 // 邮件设置功能 - 系统管理/个人设置模块下的邮件设置功能
 
 include_once(__DIR__ . '/../../../database.php');
+check_access_via_framework();
 session_start();
 if (!isset($_SESSION['user_id'])) {
     header('Location: /login.php');
