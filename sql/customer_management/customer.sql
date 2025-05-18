@@ -45,3 +45,168 @@ CREATE TABLE `customer` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '客户信息表';
 
 INSERT INTO customer (customer_name_cn, customer_name_en, company_leader, email, business_staff_id, internal_signer, external_signer, process_staff_id, customer_level, address, bank_name, deal_status, project_leader_id, remark, case_type_patent, case_type_trademark, case_type_copyright, phone, industry, creator, internal_signer_phone, external_signer_phone, billing_address, credit_level, address_en, bank_account, customer_id_code, new_case_manager_id, fax, customer_source, internal_signer_email, external_signer_email, delivery_address, sign_date, public_email, tax_id, created_at) VALUES ('测试客户', 'Test Customer', '张三', 'test@example.com', 1, '李四', '王五', 2, '一般客户', '广州市天河区', '中国银行', '是', 3, '这是一个测试客户', 1, 1, 0, '020-12345678', '地产,制造业,互联网', 'admin', '020-87654321', '13800138000', '广州市天河区某路', '高度信誉', 'Guangzhou, China', '6222021234567890', 'KH20240517001', 4, '020-88888888', '客户介绍', 'lisi@example.com', 'wangwu@example.com', '广州市天河区收货点', '2024-05-17', 'public@example.com', '91440101MA5XXXXXX', NOW());
+
+-- 联系人信息表
+CREATE TABLE `contact` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `customer_id` INT(11) NOT NULL COMMENT '关联客户ID',
+    `name` VARCHAR(50) NOT NULL COMMENT '姓名',
+    `mobile` VARCHAR(30) NOT NULL COMMENT '手机',
+    `position` VARCHAR(50) DEFAULT NULL COMMENT '职位',
+    `private_email` VARCHAR(100) DEFAULT NULL COMMENT '私人邮箱',
+    `gender` TINYINT(1) DEFAULT NULL COMMENT '性别（0女1男2未知）',
+    `fax` VARCHAR(30) DEFAULT NULL COMMENT '传真',
+    `wechat` VARCHAR(50) DEFAULT NULL COMMENT '微信号',
+    `letter_title` VARCHAR(100) DEFAULT NULL COMMENT '信函抬头',
+    `work_address` VARCHAR(200) NOT NULL COMMENT '工作地址',
+    `home_address` VARCHAR(200) DEFAULT NULL COMMENT '家庭地址',
+    `hobby` VARCHAR(200) DEFAULT NULL COMMENT '兴趣爱好',
+    `remark` TEXT COMMENT '备注',
+    `work_email` VARCHAR(100) DEFAULT NULL COMMENT '工作邮箱',
+    `phone` VARCHAR(30) DEFAULT NULL COMMENT '电话',
+    `salutation` VARCHAR(10) DEFAULT NULL COMMENT '称呼（无、博士、小姐、教授、先生、女士、经理、总经理）',
+    `is_active` TINYINT(1) DEFAULT 1 COMMENT '是否在职（1是0否）',
+    `contact_type` VARCHAR(20) NOT NULL COMMENT '联系人类别（IPR员、流程人员、技术联系人员、财务人员、公司签发人、发明人、来文通知人员、商标联系人员、其他）',
+    `qq` VARCHAR(30) DEFAULT NULL COMMENT 'QQ',
+    `sort_order` INT(11) DEFAULT 0 COMMENT '排序序号',
+    `postcode` VARCHAR(20) DEFAULT NULL COMMENT '邮编',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_customer_id` (`customer_id`),
+    CONSTRAINT `fk_contact_customer` FOREIGN KEY (`customer_id`) REFERENCES `customer`(`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '联系人信息表';
+
+-- 申请人信息表
+CREATE TABLE `applicant` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `customer_id` INT(11) NOT NULL COMMENT '关联客户ID',
+    -- 基本信息
+    `case_type` VARCHAR(50) DEFAULT NULL COMMENT '案件类型（专利/商标/版权，逗号分隔）',
+    `applicant_type` VARCHAR(20) DEFAULT NULL COMMENT '申请人类型（个人/单位/其他）',
+    `entity_type` VARCHAR(20) DEFAULT NULL COMMENT '实体类型（大实体/小实体/微实体）',
+    `name_cn` VARCHAR(100) DEFAULT NULL COMMENT '名称(中文)',
+    `name_en` VARCHAR(100) DEFAULT NULL COMMENT '名称(英文)',
+    `name_xing_cn` VARCHAR(50) DEFAULT NULL COMMENT '名称/姓(中文)',
+    `name_xing_en` VARCHAR(50) DEFAULT NULL COMMENT '名称/姓(英文)',
+    `is_first_contact` TINYINT(1) DEFAULT 0 COMMENT '是否第一联系人（0否1是）',
+    `is_receipt_title` TINYINT(1) DEFAULT 0 COMMENT '作为收据抬头（0否1是）',
+    `receipt_title` VARCHAR(100) DEFAULT NULL COMMENT '申请人收据抬头（勾选作为收据抬头时填写）',
+    `credit_code` VARCHAR(50) DEFAULT NULL COMMENT '申请人统一社会信用代码（勾选作为收据抬头时填写）',
+    -- 其它字段
+    `contact_person` VARCHAR(50) DEFAULT NULL COMMENT '联系人',
+    `phone` VARCHAR(30) DEFAULT NULL COMMENT '电话',
+    `email` VARCHAR(100) DEFAULT NULL COMMENT '邮件',
+    `province` VARCHAR(50) DEFAULT NULL COMMENT '省份',
+    `city_cn` VARCHAR(50) DEFAULT NULL COMMENT '城市(中文)',
+    `city_en` VARCHAR(50) DEFAULT NULL COMMENT '城市(英文)',
+    `district` VARCHAR(50) DEFAULT NULL COMMENT '行政区划',
+    `postcode` VARCHAR(20) DEFAULT NULL COMMENT '邮编',
+    `address_cn` VARCHAR(200) DEFAULT NULL COMMENT '街道地址(中文)',
+    `address_en` VARCHAR(200) DEFAULT NULL COMMENT '街道地址(英文)',
+    `department_cn` VARCHAR(100) DEFAULT NULL COMMENT '部门/楼层(中文)',
+    `department_en` VARCHAR(100) DEFAULT NULL COMMENT '部门/楼层(英文)',
+    `id_type` VARCHAR(50) DEFAULT NULL COMMENT '证件类型',
+    `id_number` VARCHAR(100) DEFAULT NULL COMMENT '证件号',
+    `is_fee_reduction` TINYINT(1) DEFAULT 0 COMMENT '费用减案（0否1是）',
+    `fee_reduction_start` DATE DEFAULT NULL COMMENT '费用减案有效期起',
+    `fee_reduction_end` DATE DEFAULT NULL COMMENT '费用减案有效期止',
+    `fee_reduction_code` VARCHAR(100) DEFAULT NULL COMMENT '备案证件号',
+    `cn_agent_code` VARCHAR(100) DEFAULT NULL COMMENT '中国总委托编号',
+    `pct_agent_code` VARCHAR(100) DEFAULT NULL COMMENT 'PCT总委托编号',
+    `is_fee_monitor` TINYINT(1) DEFAULT 0 COMMENT '监控年费（0否1是）',
+    `country` VARCHAR(100) DEFAULT NULL COMMENT '国家(地区)',
+    `nationality` VARCHAR(100) DEFAULT NULL COMMENT '国籍',
+    `business_license` VARCHAR(200) DEFAULT NULL COMMENT '营业执照（文件路径）',
+    `remark` TEXT COMMENT '备注',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_customer_id` (`customer_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '申请人信息表';
+
+-- 申请人相关上传文件表
+CREATE TABLE `applicant_file` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `applicant_id` INT(11) NOT NULL COMMENT '关联申请人ID',
+    `file_type` VARCHAR(50) NOT NULL COMMENT '文件类型（费减证明/总委托书/附件）',
+    `file_name` VARCHAR(200) NOT NULL COMMENT '文件名',
+    `file_path` VARCHAR(300) NOT NULL COMMENT '文件存储路径',
+    `official_issue_date` DATE DEFAULT NULL COMMENT '官方发文日（可选）',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_applicant_id` (`applicant_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '申请人相关上传文件表';
+
+-- 发明人信息表
+CREATE TABLE `inventor` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `name_cn` VARCHAR(50) NOT NULL COMMENT '中文名',
+    `name_en` VARCHAR(50) DEFAULT NULL COMMENT '英文名',
+    `job_no` VARCHAR(30) DEFAULT NULL COMMENT '工号',
+    `xing_cn` VARCHAR(50) DEFAULT NULL COMMENT '名称/姓(中文)',
+    `xing_en` VARCHAR(50) DEFAULT NULL COMMENT '名称/姓(英文)',
+    `ming_cn` VARCHAR(50) DEFAULT NULL COMMENT '名(中文)',
+    `ming_en` VARCHAR(50) DEFAULT NULL COMMENT '名(英文)',
+    `nationality` VARCHAR(50) DEFAULT NULL COMMENT '国籍',
+    `country` VARCHAR(50) DEFAULT NULL COMMENT '国家(地区)',
+    `is_tech_contact` TINYINT(1) DEFAULT 0 COMMENT '是否为技术联系人(0否1是)',
+    `province` VARCHAR(50) DEFAULT NULL COMMENT '省份',
+    `city_cn` VARCHAR(50) DEFAULT NULL COMMENT '城市(中文)',
+    `city_en` VARCHAR(50) DEFAULT NULL COMMENT '城市(英文)',
+    `address_cn` VARCHAR(200) DEFAULT NULL COMMENT '街道地址(中文)',
+    `address_en` VARCHAR(200) DEFAULT NULL COMMENT '街道地址(英文)',
+    `department_cn` VARCHAR(100) DEFAULT NULL COMMENT '部门/楼层(中文)',
+    `department_en` VARCHAR(100) DEFAULT NULL COMMENT '部门/楼层(英文)',
+    `email` VARCHAR(100) DEFAULT NULL COMMENT '邮件',
+    `id_number` VARCHAR(50) DEFAULT NULL COMMENT '证件号码',
+    `phone` VARCHAR(30) DEFAULT NULL COMMENT '座机',
+    `qq` VARCHAR(30) DEFAULT NULL COMMENT 'QQ',
+    `mobile` VARCHAR(30) DEFAULT NULL COMMENT '手机',
+    `postcode` VARCHAR(20) DEFAULT NULL COMMENT '邮编',
+    `remark` TEXT COMMENT '备注',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '发明人信息表';
+
+ALTER TABLE `inventor`
+ADD COLUMN `customer_id` INT(11) NOT NULL COMMENT '关联客户ID' AFTER `id`,
+ADD KEY `idx_customer_id` (`customer_id`),
+ADD CONSTRAINT `fk_inventor_customer` FOREIGN KEY (`customer_id`) REFERENCES `customer`(`id`) ON DELETE CASCADE;
+
+-- 客户要求
+CREATE TABLE `customer_requirement` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `customer_id` INT(11) NOT NULL COMMENT '关联客户ID',
+    `user_id` INT(11) DEFAULT NULL COMMENT '更新者/创建人ID',
+    `case_type` VARCHAR(50) DEFAULT NULL COMMENT '案件类型(专利/商标/版权)',
+    `requirement_type` VARCHAR(50) DEFAULT NULL COMMENT '要求类型(看稿要求/费用要求/其他要求)',
+    `title` VARCHAR(200) NOT NULL COMMENT '要求标题',
+    `content` TEXT NOT NULL COMMENT '要求内容',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_customer_id` (`customer_id`),
+    KEY `idx_user_id` (`user_id`),
+    CONSTRAINT `fk_req_customer` FOREIGN KEY (`customer_id`) REFERENCES `customer`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_req_user` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户要求表';
+
+-- 联系记录
+CREATE TABLE `contact_record` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `contact_id` INT(11) NOT NULL COMMENT '客户联系人ID，关联contact表',
+    `contact_time` DATE NOT NULL COMMENT '联系时间',
+    `contact_method` VARCHAR(50) NOT NULL COMMENT '联系方式（如电话、拜访、邮件等）',
+    `contact_type` VARCHAR(50) NOT NULL COMMENT '联系类型（如案件通知、费用通知、官文通知）',
+    `content` TEXT NOT NULL COMMENT '联系内容',
+    `user_id` INT(11) NOT NULL COMMENT '我方联系人ID，关联user表',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_contact_id` (`contact_id`),
+    KEY `idx_user_id` (`user_id`),
+    CONSTRAINT `fk_contact_record_contact` FOREIGN KEY (`contact_id`) REFERENCES `contact`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_contact_record_user` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE RESTRICT
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '联系记录表';

@@ -179,6 +179,20 @@
     background: #d0d0d0; /* 悬停背景 */
 }
 
+/* 禁用按钮 */
+.btn-mini:disabled,
+.btn-mini[disabled] {
+    background: #eee; /* 禁用背景 */
+    color: #aaa; /* 禁用字体 */
+    cursor: not-allowed; /* 禁止鼠标 */
+    border-color: #ddd; /* 边框颜色 */
+}
+.btn-mini:disabled:hover,
+.btn-mini[disabled]:hover {
+    background: #eee; /* 禁用背景 */
+    color: #aaa; /* 禁用字体 */
+}
+
 /* 选中高亮 */
 .module-selected {
     background: #e0f7fa !important; /* 选中行高亮 */
@@ -430,4 +444,11 @@
     background: #e0f7fa; /* 浅蓝背景 */
     border-color: #29b6b0; /* 蓝绿色边框 */
     color: #29b6b0; /* 蓝绿色字体 */
+}
+
+.tab-btn.active,
+.btn-mini.active {
+    background: #29b6b0;
+    color: #fff;
+    border-color: #29b6b0;
 }

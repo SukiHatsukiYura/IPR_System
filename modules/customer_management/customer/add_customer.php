@@ -436,6 +436,63 @@ function render_user_search($name, $users, $post_val)
         </table>
     </form>
 </div>
+<?php if ($is_edit_mode && $customer_id > 0): ?>
+
+    <div class="module-btn">
+        <div id="customer-tabs-bar" style="margin-bottom:10px;">
+            <button type="button" class="btn-mini tab-btn active" data-tab="contact">联系人</button>
+            <button type="button" class="btn-mini tab-btn" data-tab="applicant">申请人</button>
+            <button type="button" class="btn-mini tab-btn" data-tab="inventor">发明人</button>
+            <button type="button" class="btn-mini tab-btn" data-tab="requirement">客户要求</button>
+            <button type="button" class="btn-mini tab-btn" data-tab="contact_record">联系记录</button>
+            <!-- 以后可加更多tab按钮 -->
+        </div>
+        <div id="customer-tab-content" style="min-height:180px;"></div>
+    </div>
+    <script>
+        (function() {
+            var customerId = <?= $customer_id ?>;
+
+            function loadTab(tab) {
+                var content = document.getElementById('customer-tab-content');
+                content.innerHTML = '<div style="padding:40px;text-align:center;color:#888;">加载中...</div>';
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', 'modules/customer_management/customer/customer_tabs/' + tab + '.php?customer_id=' + customerId, true);
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            content.innerHTML = xhr.responseText;
+                            // 提取并执行所有<script>标签
+                            var scripts = content.querySelectorAll('script');
+                            scripts.forEach(function(script) {
+                                var newScript = document.createElement('script');
+                                if (script.src) {
+                                    newScript.src = script.src;
+                                } else {
+                                    newScript.text = script.textContent;
+                                }
+                                document.body.appendChild(newScript);
+                            });
+                        } else {
+                            content.innerHTML = '<div style="padding:40px;text-align:center;color:#f44336;">加载失败</div>';
+                        }
+                    }
+                };
+                xhr.send();
+            }
+            // tab切换
+            document.querySelectorAll('.tab-btn').forEach(function(btn) {
+                btn.onclick = function() {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    loadTab(btn.getAttribute('data-tab'));
+                };
+            });
+            // 默认加载联系人tab
+            loadTab('contact');
+        })();
+    </script>
+<?php endif; ?>
 <script>
     (function() {
         var form = document.querySelector('.module-form');

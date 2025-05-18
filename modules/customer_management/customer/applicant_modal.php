@@ -1,211 +1,10 @@
-<?php
-// 申请人列表页面 - 客户管理/客户模块下的申请人管理功能
-
-include_once(__DIR__ . '/../../../database.php');
-check_access_via_framework();
-session_start();
-if (!isset($_SESSION['user_id'])) {
-    if (isset($_GET['ajax']) || isset($_POST['ajax'])) {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'msg' => '未登录或会话超时']);
-        exit;
-    } else {
-        header('Location: /login.php');
-        exit;
-    }
-}
-
-// 查询条件选项
-$yesno = ['' => '--请选择--', '0' => '否', '1' => '是'];
-
-// 查询所有客户用于下拉
-$customer_stmt = $pdo->prepare("SELECT id, customer_name_cn FROM customer ORDER BY customer_name_cn ASC");
-$customer_stmt->execute();
-$customers = $customer_stmt->fetchAll();
-
-// 处理AJAX请求
-if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
-    header('Content-Type: application/json');
-    $page = max(1, intval($_GET['page'] ?? 1));
-    $page_size = min(max(1, intval($_GET['page_size'] ?? 10)), 100);
-    $offset = ($page - 1) * $page_size;
-    $where = [];
-    $params = [];
-    // 查询条件
-    if (!empty($_GET['name_cn'])) {
-        $where[] = 'a.name_cn LIKE :name_cn';
-        $params['name_cn'] = '%' . $_GET['name_cn'] . '%';
-    }
-    if (!empty($_GET['address_cn'])) {
-        $where[] = 'a.address_cn LIKE :address_cn';
-        $params['address_cn'] = '%' . $_GET['address_cn'] . '%';
-    }
-    if (!empty($_GET['country'])) {
-        $where[] = 'a.country LIKE :country';
-        $params['country'] = '%' . $_GET['country'] . '%';
-    }
-    if (!empty($_GET['customer_id'])) {
-        $where[] = 'a.customer_id = :customer_id';
-        $params['customer_id'] = $_GET['customer_id'];
-    }
-    if (!empty($_GET['created_from'])) {
-        $where[] = 'a.created_at >= :created_from';
-        $params['created_from'] = $_GET['created_from'] . ' 00:00:00';
-    }
-    if (!empty($_GET['created_to'])) {
-        $where[] = 'a.created_at <= :created_to';
-        $params['created_to'] = $_GET['created_to'] . ' 23:59:59';
-    }
-    if (isset($_GET['is_fee_monitor']) && $_GET['is_fee_monitor'] !== '') {
-        $where[] = 'a.is_fee_monitor = :is_fee_monitor';
-        $params['is_fee_monitor'] = $_GET['is_fee_monitor'];
-    }
-    $sql_where = $where ? ' WHERE ' . implode(' AND ', $where) : '';
-    $count_sql = "SELECT COUNT(*) FROM applicant a $sql_where";
-    $count_stmt = $pdo->prepare($count_sql);
-    $count_stmt->execute($params);
-    $total_records = $count_stmt->fetchColumn();
-    $total_pages = ceil($total_records / $page_size);
-    $sql = "SELECT a.*, c.customer_name_cn FROM applicant a LEFT JOIN customer c ON a.customer_id = c.id $sql_where ORDER BY a.id DESC LIMIT :offset, :limit";
-    $stmt = $pdo->prepare($sql);
-    $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
-    $stmt->bindParam(':limit', $page_size, PDO::PARAM_INT);
-    foreach ($params as $key => $value) {
-        $stmt->bindValue(':' . $key, $value);
-    }
-    $stmt->execute();
-    $rows = $stmt->fetchAll();
-    $html = '';
-    if (empty($rows)) {
-        $html = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">暂无数据</td></tr>';
-    } else {
-        foreach ($rows as $index => $a) {
-            $area = htmlspecialchars(($a['province'] ?? '') . ($a['city_cn'] ? ' ' . $a['city_cn'] : '') . ($a['district'] ? ' ' . $a['district'] : ''));
-            $case_types = htmlspecialchars(str_replace(',', '，', $a['case_type'] ?? ''));
-            $html .= '<tr data-id="' . $a['id'] . '" data-customer-id="' . $a['customer_id'] . '">' .
-                '<td style="text-align:center;">' . ($offset + $index + 1) . '</td>' .
-                '<td>' . htmlspecialchars($a['customer_name_cn'] ?? '') . '</td>' .
-                '<td>' . htmlspecialchars($a['name_cn'] ?? '') . '</td>' .
-                // '<td>' . htmlspecialchars($a['name_en'] ?? '') . '</td>' .
-                '<td>' . $area . '</td>' .
-                '<td>' . htmlspecialchars($a['address_cn'] ?? '') . '</td>' .
-                '<td>' . htmlspecialchars($a['phone'] ?? '') . '</td>' .
-                '<td>' . htmlspecialchars($a['email'] ?? '') . '</td>' .
-                '<td style="text-align:center;">' . ($a['is_first_contact'] ? '是' : '否') . '</td>' .
-                '<td>' . $case_types . '</td>' .
-                '<td style="text-align:center;">' .
-                '<button type="button" class="btn-mini btn-edit">✎</button>' .
-                '<button type="button" class="btn-mini btn-del" style="color:#f44336;">✖</button>' .
-                '</td>' .
-                '</tr>';
-        }
-    }
-    echo json_encode([
-        'success' => true,
-        'html' => $html,
-        'total_records' => $total_records,
-        'total_pages' => $total_pages,
-        'current_page' => $page
-    ]);
-    exit;
-}
-function h($v)
-{
-    return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8');
-}
-?>
-<div class="module-panel">
-    <form id="search-form" class="module-form" autocomplete="off" style="margin-bottom:12px;">
-        <div class="module-btns">
-            <button type="button" class="btn-search"><i class="icon-search"></i> 搜索</button>
-            <button type="button" class="btn-reset"><i class="icon-cancel"></i> 重置</button>
-        </div>
-        <table class="module-table" style="margin-bottom:10px;width:100%;min-width:0;">
-            <tr>
-                <td class="module-label" style="width:110px;">申请人：</td>
-                <td style="width:240px;"><input type="text" name="name_cn" class="module-input" style="width:220px;"></td>
-                <td class="module-label" style="width:110px;">申请人地址：</td>
-                <td style="width:240px;"><input type="text" name="address_cn" class="module-input" style="width:220px;"></td>
-            </tr>
-            <tr>
-                <td class="module-label">客户名称：</td>
-                <td>
-                    <select name="customer_id" class="module-input" style="width:220px;">
-                        <option value="">--全部--</option>
-                        <?php foreach ($customers as $c): ?>
-                            <option value="<?= h($c['id']) ?>"><?= h($c['customer_name_cn']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </td>
-                <td class="module-label">国家(地区)：</td>
-                <td><input type="text" name="country" class="module-input" style="width:220px;"></td>
-            </tr>
-            <tr>
-                <td class="module-label">创建日期：</td>
-                <td>
-                    <input type="date" name="created_from" class="module-input" style="width:104px;display:inline-block;"> -
-                    <input type="date" name="created_to" class="module-input" style="width:104px;display:inline-block;">
-                </td>
-                <td class="module-label">是否监控年费：</td>
-                <td>
-                    <select name="is_fee_monitor" class="module-input" style="width:220px;">
-                        <?php foreach ($yesno as $k => $v): ?>
-                            <option value="<?= h($k) ?>"><?= h($v) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </td>
-            </tr>
-        </table>
-
-    </form>
-    <table class="module-table">
-        <thead>
-            <tr style="background:#f2f2f2;">
-                <th style="width:40px;text-align:center;">序号</th>
-                <th style="width:140px;">客户名称</th>
-                <th style="width:120px;">申请人(中文)</th>
-                <!-- <th style="width:120px;">申请人(英文)</th> -->
-                <th style="width:120px;">所属地区</th>
-                <th style="width:160px;">申请人地址</th>
-                <th style="width:100px;">联系电话</th>
-                <th style="width:140px;">邮件</th>
-                <th style="width:60px;">第一联系人</th>
-                <th style="width:100px;">案件类型</th>
-                <th style="width:90px;">操作</th>
-            </tr>
-        </thead>
-        <tbody id="applicant-list">
-            <tr>
-                <td colspan="11" style="text-align:center;padding:20px 0;">正在加载数据...</td>
-            </tr>
-        </tbody>
-    </table>
-    <div class="module-pagination">
-        <span>共 <span id="total-records">0</span> 条记录，每页</span>
-        <select id="page-size-select">
-            <option value="10" selected>10</option>
-            <option value="20">20</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-        </select>
-        <span>条，当前 <span id="current-page">1</span>/<span id="total-pages">1</span> 页</span>
-        <button type="button" class="btn-page-go" data-page="1" id="btn-first-page">首页</button>
-        <button type="button" class="btn-page-go" data-page="" id="btn-prev-page">上一页</button>
-        <button type="button" class="btn-page-go" data-page="" id="btn-next-page">下一页</button>
-        <button type="button" class="btn-page-go" data-page="" id="btn-last-page">末页</button>
-        <span>跳转到</span>
-        <input type="number" id="page-input" min="1" value="1">
-        <span>页</span>
-        <button type="button" id="btn-page-jump" class="btn-page-go">确定</button>
-    </div>
-</div>
-<!-- 申请人编辑弹窗（完整字段，复用applicant.php结构） -->
-<div id="edit-applicant-modal" style="display:none;position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:9999;align-items:center;justify-content:center;">
+<!-- applicant_modal.php：申请人编辑弹窗及相关JS，通用复用 -->
+<div id="applicant-modal" style="display:none;position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:9999;align-items:center;justify-content:center;">
     <div style="background:#fff;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,0.18);padding:24px 32px;width:950px;max-width:98vw;max-height:80vh;position:relative;display:flex;flex-direction:column;">
-        <div style="position:absolute;right:18px;top:10px;cursor:pointer;font-size:22px;color:#888;" id="edit-applicant-modal-close">×</div>
-        <h3 style="text-align:center;margin-bottom:18px;">编辑申请人</h3>
+        <div style="position:absolute;right:18px;top:10px;cursor:pointer;font-size:22px;color:#888;" id="applicant-modal-close">×</div>
+        <h3 style="text-align:center;margin-bottom:18px;">申请人信息</h3>
         <div style="flex:1 1 auto;overflow-y:auto;">
-            <form id="edit-applicant-form" class="module-form">
+            <form id="applicant-form" class="module-form">
                 <input type="hidden" name="id" value="0">
                 <input type="hidden" name="customer_id" value="">
                 <table class="module-table" style="table-layout:fixed;width:100%;min-width:0;">
@@ -393,240 +192,126 @@ function h($v)
                     </tr>
                 </table>
                 <div style="text-align:center;margin-top:12px;">
-                    <button type="button" class="btn-save-edit-applicant btn-mini" style="margin-right:16px;">保存</button>
-                    <button type="button" class="btn-cancel-edit-applicant btn-mini">取消</button>
+                    <button type="button" class="btn-save-applicant btn-mini" style="margin-right:16px;">保存</button>
+                    <button type="button" class="btn-cancel-applicant btn-mini">取消</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 <script>
-    (function() {
-        var form = document.getElementById('search-form'),
-            btnSearch = form.querySelector('.btn-search'),
-            btnReset = form.querySelector('.btn-reset'),
-            applicantList = document.getElementById('applicant-list'),
-            totalRecordsEl = document.getElementById('total-records'),
-            currentPageEl = document.getElementById('current-page'),
-            totalPagesEl = document.getElementById('total-pages'),
-            btnFirstPage = document.getElementById('btn-first-page'),
-            btnPrevPage = document.getElementById('btn-prev-page'),
-            btnNextPage = document.getElementById('btn-next-page'),
-            btnLastPage = document.getElementById('btn-last-page'),
-            pageInput = document.getElementById('page-input'),
-            btnPageJump = document.getElementById('btn-page-jump'),
-            pageSizeSelect = document.getElementById('page-size-select');
-        var currentPage = 1,
-            pageSize = 10,
-            totalPages = 1;
-
-        function loadApplicantData() {
-            applicantList.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">正在加载数据...</td></tr>';
-            var formData = new FormData(form),
-                params = new URLSearchParams();
-            params.append('ajax', 1);
-            params.append('page', currentPage);
-            params.append('page_size', pageSize);
-            for (var pair of formData.entries()) {
-                if (pair[0] !== 'page' && pair[0] !== 'page_size') params.append(pair[0], pair[1]);
+    // applicantModal：通用申请人弹窗对象
+    window.applicantModal = (function() {
+        var modal, form, closeBtn, cancelBtn, saveBtn, receiptCb;
+        var onSuccessCallback = null;
+        // 初始化事件
+        function init() {
+            modal = document.getElementById('applicant-modal');
+            form = document.getElementById('applicant-form');
+            closeBtn = document.getElementById('applicant-modal-close');
+            cancelBtn = form.querySelector('.btn-cancel-applicant');
+            saveBtn = form.querySelector('.btn-save-applicant');
+            receiptCb = document.getElementById('is_receipt_title_cb');
+            if (closeBtn) closeBtn.onclick = hide;
+            if (cancelBtn) cancelBtn.onclick = hide;
+            if (receiptCb) {
+                receiptCb.addEventListener('change', function() {
+                    document.getElementById('receipt_title_row').style.display = receiptCb.checked ? '' : 'none';
+                });
             }
-            var requestUrl = 'modules/customer_management/customer/applicant_list.php'; // 绝对路径
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', requestUrl + '?' + params.toString(), true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    console.log('AJAX响应内容:', xhr.status, xhr.responseText); // 调试输出
-                    if (xhr.status === 200) {
-                        try {
-                            var response = JSON.parse(xhr.responseText);
-                            if (response.success) {
-                                applicantList.innerHTML = response.html;
-                                totalRecordsEl.textContent = response.total_records;
-                                currentPageEl.textContent = response.current_page;
-                                totalPagesEl.textContent = response.total_pages;
-                                currentPage = parseInt(response.current_page);
-                                totalPages = parseInt(response.total_pages) || 1;
-                                updatePaginationButtons();
-                                bindTableRowClick();
-                            } else {
-                                applicantList.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">加载数据失败</td></tr>';
-                            }
-                        } catch (e) {
-                            applicantList.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">加载数据失败</td></tr>';
-                            console.error('JSON解析失败', e, xhr.responseText);
-                        }
-                    } else {
-                        applicantList.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">加载数据失败，请稍后重试</td></tr>';
+            if (saveBtn) {
+                saveBtn.onclick = function() {
+                    // 多选案件类型
+                    var checkedTypes = Array.from(form.querySelectorAll('input[type=checkbox][name^=case_type_]:checked')).map(function(cb) {
+                        return cb.value;
+                    });
+                    form.case_type.value = checkedTypes.join(',');
+                    form.is_first_contact.value = form.is_first_contact.checked ? 1 : 0;
+                    form.is_receipt_title.value = form.is_receipt_title.checked ? 1 : 0;
+                    if (!form.is_receipt_title.checked) {
+                        form.receipt_title.value = '';
+                        form.credit_code.value = '';
                     }
-                }
-            };
-            xhr.send();
-        }
-
-        function bindTableRowClick() {
-            applicantList.querySelectorAll('tr[data-id]').forEach(function(row) {
-                row.querySelector('.btn-del').onclick = function() {
-                    if (!confirm('确定删除该申请人？')) return;
-                    var id = row.getAttribute('data-id');
-                    var customerId = row.getAttribute('data-customer-id');
+                    var fd = new FormData(form);
+                    fd.append('action', 'save');
                     var xhr = new XMLHttpRequest();
-                    var fd = new FormData();
-                    fd.append('action', 'delete');
-                    fd.append('id', id);
-                    fd.append('customer_id', customerId);
                     xhr.open('POST', 'modules/customer_management/customer/customer_tabs/applicant.php', true);
                     xhr.onload = function() {
                         try {
                             var res = JSON.parse(xhr.responseText);
                             if (res.success) {
-                                loadApplicantData();
+                                hide();
+                                if (typeof onSuccessCallback === 'function') onSuccessCallback();
                             } else {
-                                alert('删除失败');
+                                alert(res.msg || '保存失败');
                             }
                         } catch (e) {
-                            alert('删除失败');
+                            alert('保存失败');
                         }
                     };
                     xhr.send(fd);
                 };
-                row.querySelector('.btn-edit').onclick = function() {
-                    // 完整弹窗编辑，传递id和customer_id
-                    var id = row.getAttribute('data-id');
-                    var customerId = row.getAttribute('data-customer-id');
-                    var modal = document.getElementById('edit-applicant-modal');
-                    var form = document.getElementById('edit-applicant-form');
-                    form.reset();
-                    var fd = new FormData();
-                    fd.append('action', 'get');
-                    fd.append('id', id);
-                    fd.append('customer_id', customerId);
-                    var xhr = new XMLHttpRequest();
-                    xhr.open('POST', 'modules/customer_management/customer/customer_tabs/applicant.php', true);
-                    xhr.onload = function() {
-                        try {
-                            var res = JSON.parse(xhr.responseText);
-                            if (res.success && res.data) {
-                                for (var k in res.data) {
-                                    if (form[k] !== undefined && form[k].type !== 'checkbox') form[k].value = res.data[k] !== null ? res.data[k] : '';
-                                }
-                                // 多选案件类型
-                                if (res.data.case_type) {
-                                    var arr = res.data.case_type.split(',');
-                                    form.querySelectorAll('input[type=checkbox][name^=case_type_]').forEach(function(cb) {
-                                        cb.checked = arr.indexOf(cb.value) !== -1;
-                                    });
-                                } else {
-                                    form.querySelectorAll('input[type=checkbox][name^=case_type_]').forEach(function(cb) {
-                                        cb.checked = false;
-                                    });
-                                }
-                                form.is_first_contact.checked = res.data.is_first_contact == 1;
-                                form.is_receipt_title.checked = res.data.is_receipt_title == 1;
-                                document.getElementById('receipt_title_row').style.display = form.is_receipt_title.checked ? '' : 'none';
-                                form.customer_id.value = customerId;
-                                modal.style.display = 'flex';
-                                // 绑定文件上传
-                                bindFileUpload(id);
-                            } else {
-                                alert('获取数据失败');
-                            }
-                        } catch (e) {
-                            alert('获取数据失败');
-                        }
-                    };
-                    xhr.send(fd);
-                };
-            });
-        }
-
-        function updatePaginationButtons() {
-            btnFirstPage.disabled = currentPage <= 1;
-            btnPrevPage.disabled = currentPage <= 1;
-            btnNextPage.disabled = currentPage >= totalPages;
-            btnLastPage.disabled = currentPage >= totalPages;
-            btnPrevPage.setAttribute('data-page', currentPage - 1);
-            btnNextPage.setAttribute('data-page', currentPage + 1);
-            btnLastPage.setAttribute('data-page', totalPages);
-            pageInput.max = totalPages;
-            pageInput.value = currentPage;
-        }
-        btnSearch.onclick = function() {
-            currentPage = 1;
-            loadApplicantData();
-        };
-        btnReset.onclick = function() {
-            form.reset();
-            currentPage = 1;
-            loadApplicantData();
-        };
-        pageSizeSelect.onchange = function() {
-            pageSize = parseInt(this.value);
-            currentPage = 1;
-            loadApplicantData();
-        };
-        [btnFirstPage, btnPrevPage, btnNextPage, btnLastPage].forEach(function(btn) {
-            btn.onclick = function() {
-                if (!this.disabled) {
-                    currentPage = parseInt(this.getAttribute('data-page'));
-                    loadApplicantData();
-                }
-            };
-        });
-        btnPageJump.onclick = function() {
-            var page = parseInt(pageInput.value);
-            if (isNaN(page) || page < 1) page = 1;
-            if (page > totalPages) page = totalPages;
-            currentPage = page;
-            loadApplicantData();
-        };
-        // 弹窗关闭
-        document.getElementById('edit-applicant-modal-close').onclick = function() {
-            document.getElementById('edit-applicant-modal').style.display = 'none';
-        };
-        document.querySelector('.btn-cancel-edit-applicant').onclick = function() {
-            document.getElementById('edit-applicant-modal').style.display = 'none';
-        };
-        // 弹窗保存
-        document.querySelector('.btn-save-edit-applicant').onclick = function() {
-            var form = document.getElementById('edit-applicant-form');
-            // 多选案件类型
-            var checkedTypes = Array.from(form.querySelectorAll('input[type=checkbox][name^=case_type_]:checked')).map(function(cb) {
-                return cb.value;
-            });
-            form.case_type.value = checkedTypes.join(',');
-            form.is_first_contact.value = form.is_first_contact.checked ? 1 : 0;
-            form.is_receipt_title.value = form.is_receipt_title.checked ? 1 : 0;
-            if (!form.is_receipt_title.checked) {
-                form.receipt_title.value = '';
-                form.credit_code.value = '';
             }
-            var fd = new FormData(form);
-            fd.append('action', 'save');
+        }
+        // 显示弹窗，data: {id, customer_id, mode, onSuccess}
+        function show(data) {
+            if (!modal) init();
+            onSuccessCallback = typeof data.onSuccess === 'function' ? data.onSuccess : null;
+            form.reset();
+            // 新增
+            if (!data.id || data.id == 0) {
+                form.id.value = 0;
+                form.customer_id.value = data.customer_id || '';
+                document.getElementById('receipt_title_row').style.display = 'none';
+                modal.style.display = 'flex';
+                bindFileUpload(0); // 新增时无文件
+                return;
+            }
+            // 编辑，拉取数据
+            var fd = new FormData();
+            fd.append('action', 'get');
+            fd.append('id', data.id);
+            fd.append('customer_id', data.customer_id);
             var xhr = new XMLHttpRequest();
             xhr.open('POST', 'modules/customer_management/customer/customer_tabs/applicant.php', true);
             xhr.onload = function() {
                 try {
                     var res = JSON.parse(xhr.responseText);
-                    if (res.success) {
-                        document.getElementById('edit-applicant-modal').style.display = 'none';
-                        loadApplicantData();
+                    if (res.success && res.data) {
+                        for (var k in res.data) {
+                            if (form[k] !== undefined && form[k].type !== 'checkbox') form[k].value = res.data[k] !== null ? res.data[k] : '';
+                        }
+                        // 多选案件类型
+                        if (res.data.case_type) {
+                            var arr = res.data.case_type.split(',');
+                            form.querySelectorAll('input[type=checkbox][name^=case_type_]').forEach(function(cb) {
+                                cb.checked = arr.indexOf(cb.value) !== -1;
+                            });
+                        } else {
+                            form.querySelectorAll('input[type=checkbox][name^=case_type_]').forEach(function(cb) {
+                                cb.checked = false;
+                            });
+                        }
+                        form.is_first_contact.checked = res.data.is_first_contact == 1;
+                        form.is_receipt_title.checked = res.data.is_receipt_title == 1;
+                        document.getElementById('receipt_title_row').style.display = form.is_receipt_title.checked ? '' : 'none';
+                        form.customer_id.value = data.customer_id;
+                        modal.style.display = 'flex';
+                        bindFileUpload(data.id);
                     } else {
-                        alert(res.msg || '保存失败');
+                        alert('获取数据失败');
                     }
                 } catch (e) {
-                    alert('保存失败');
+                    alert('获取数据失败');
                 }
             };
             xhr.send(fd);
-        };
-        // 控制"作为收据抬头"显示隐藏
-        var receiptCb = document.getElementById('is_receipt_title_cb');
-        if (receiptCb) {
-            receiptCb.addEventListener('change', function() {
-                document.getElementById('receipt_title_row').style.display = receiptCb.checked ? '' : 'none';
-            });
         }
-        // 文件上传/删除/回显逻辑（复用applicant.php的bindFileUpload、renderFileList）
+        // 关闭弹窗
+        function hide() {
+            if (modal) modal.style.display = 'none';
+        }
+        // 文件上传/删除/回显逻辑
         function renderFileList(applicantId, fileType, listDivId) {
             var listDiv = document.getElementById(listDivId);
             listDiv.innerHTML = '加载中...';
@@ -783,6 +468,15 @@ function h($v)
             renderFileList(applicantId, '总委托书', 'list-power');
             renderFileList(applicantId, '附件', 'list-attach');
         }
-        loadApplicantData();
+        // 页面加载时自动初始化
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+        // 对外暴露 show 方法
+        return {
+            show: show
+        };
     })();
 </script>
