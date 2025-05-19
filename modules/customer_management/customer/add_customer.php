@@ -445,6 +445,7 @@ function render_user_search($name, $users, $post_val)
             <button type="button" class="btn-mini tab-btn" data-tab="inventor">发明人</button>
             <button type="button" class="btn-mini tab-btn" data-tab="requirement">客户要求</button>
             <button type="button" class="btn-mini tab-btn" data-tab="contact_record">联系记录</button>
+            <button type="button" class="btn-mini tab-btn" data-tab="customer_file">客户文件</button>
             <!-- 以后可加更多tab按钮 -->
         </div>
         <div id="customer-tab-content" style="min-height:180px;"></div>

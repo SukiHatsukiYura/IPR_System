@@ -1,33 +1,26 @@
 <?php
-// modules/customer_management/customer/customer_tabs/contact.php
-// 联系人管理
+// modules/customer_management/agency/agency_tabs/contact.php
+// 代理机构联系人管理
 include_once(__DIR__ . '/../../../../database.php');
-
-// 访问方式检测，禁止直接访问
 check_access_via_framework();
-
 session_start();
 if (!isset($_SESSION['user_id'])) {
     header('Location: /login.php');
     exit;
 }
-
-$customer_id = intval($_GET['customer_id'] ?? $_POST['customer_id'] ?? 0);
-if ($customer_id <= 0) {
-    echo '<div style="color:#f44336;text-align:center;">未指定客户ID</div>';
+$agency_id = intval($_GET['agency_id'] ?? $_POST['agency_id'] ?? 0);
+if ($agency_id <= 0) {
+    echo '<div style="color:#f44336;text-align:center;">未指定代理机构ID</div>';
     exit;
 }
-
 // 字典选项
-$contact_types = ['IPR员', '流程人员', '技术联系人员', '财务人员', '公司签发人', '发明人', '来文通知人员', '商标联系人员', '其他'];
-$salutations = ['无', '博士', '小姐', '教授', '先生', '女士', '经理', '总经理'];
+$contact_types = ['--请选择--', 'IPR', '流程人员', '技术联系人', '财务人员', '公司负责人', '发明人', '来文通知人员', '商标联系人', '其他'];
+$salutations = ['--请选择--', '无', '博士', '小姐', '教授', '先生', '女士', '经理', '总经理'];
 $genders = ['2' => '未知', '1' => '男', '0' => '女'];
-
 function h($v)
 {
     return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8');
 }
-
 // 处理保存/编辑/删除/获取单条
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json');
@@ -58,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             'case_type_patent' => intval($_POST['case_type_patent'] ?? 0),
             'case_type_trademark' => intval($_POST['case_type_trademark'] ?? 0),
             'case_type_copyright' => intval($_POST['case_type_copyright'] ?? 0),
+            'history_address' => trim($_POST['history_address'] ?? ''),
         ];
         if ($data['name'] === '' || $data['mobile'] === '' || $data['contact_type'] === '') {
             echo json_encode(['success' => false, 'msg' => '请填写所有必填项']);
@@ -70,26 +64,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $set .= "$k=:$k,";
                 }
                 $set = rtrim($set, ',');
-                $sql = "UPDATE contact SET $set WHERE id=:id AND customer_id=:customer_id";
+                $sql = "UPDATE agency_contact SET $set WHERE id=:id AND agency_id=:agency_id";
                 $stmt = $pdo->prepare($sql);
                 foreach ($data as $k => $v) {
                     $stmt->bindValue(":$k", $v);
                 }
                 $stmt->bindValue(":id", $id, PDO::PARAM_INT);
-                $stmt->bindValue(":customer_id", $customer_id, PDO::PARAM_INT);
+                $stmt->bindValue(":agency_id", $agency_id, PDO::PARAM_INT);
                 $ok = $stmt->execute();
                 echo json_encode(['success' => $ok]);
             } else {
                 $data_insert = $data;
-                $data_insert['customer_id'] = $customer_id;
-                // 自动分配排序号
-                $stmt = $pdo->prepare("SELECT MAX(sort_order) FROM contact WHERE customer_id=?");
-                $stmt->execute([$customer_id]);
+                $data_insert['agency_id'] = $agency_id;
+                $stmt = $pdo->prepare("SELECT MAX(sort_order) FROM agency_contact WHERE agency_id=?");
+                $stmt->execute([$agency_id]);
                 $max_sort = $stmt->fetchColumn();
                 $data_insert['sort_order'] = is_numeric($max_sort) ? ($max_sort + 1) : 0;
                 $fields = implode(',', array_keys($data_insert));
                 $placeholders = ':' . implode(', :', array_keys($data_insert));
-                $sql = "INSERT INTO contact ($fields) VALUES ($placeholders)";
+                $sql = "INSERT INTO agency_contact ($fields) VALUES ($placeholders)";
                 $stmt = $pdo->prepare($sql);
                 foreach ($data_insert as $k => $v) {
                     $stmt->bindValue(":$k", $v);
@@ -104,8 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     } elseif ($action === 'delete') {
         $id = intval($_POST['id'] ?? 0);
         if ($id > 0) {
-            $stmt = $pdo->prepare("DELETE FROM contact WHERE id=? AND customer_id=?");
-            $ok = $stmt->execute([$id, $customer_id]);
+            $stmt = $pdo->prepare("DELETE FROM agency_contact WHERE id=? AND agency_id=?");
+            $ok = $stmt->execute([$id, $agency_id]);
             echo json_encode(['success' => $ok]);
         } else {
             echo json_encode(['success' => false]);
@@ -113,64 +106,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     } elseif ($action === 'get') {
         $id = intval($_POST['id'] ?? 0);
-        $stmt = $pdo->prepare("SELECT * FROM contact WHERE id=? AND customer_id=?");
-        $stmt->execute([$id, $customer_id]);
+        $stmt = $pdo->prepare("SELECT * FROM agency_contact WHERE id=? AND agency_id=?");
+        $stmt->execute([$id, $agency_id]);
         $row = $stmt->fetch();
         echo json_encode(['success' => !!$row, 'data' => $row]);
         exit;
-    } elseif ($action === 'move') {
-        $id = intval($_POST['id'] ?? 0);
-        $direction = $_POST['direction'] ?? '';
-        if ($id > 0 && in_array($direction, ['up', 'down'])) {
-            // 获取当前联系人
-            $stmt = $pdo->prepare("SELECT id, sort_order FROM contact WHERE id=? AND customer_id=?");
-            $stmt->execute([$id, $customer_id]);
-            $cur = $stmt->fetch();
-            if ($cur) {
-                // 查找相邻联系人
-                if ($direction === 'up') {
-                    $stmt2 = $pdo->prepare("SELECT id, sort_order FROM contact WHERE customer_id=? AND sort_order < ? ORDER BY sort_order DESC, id DESC LIMIT 1");
-                    $stmt2->execute([$customer_id, $cur['sort_order']]);
-                } else {
-                    $stmt2 = $pdo->prepare("SELECT id, sort_order FROM contact WHERE customer_id=? AND sort_order > ? ORDER BY sort_order ASC, id ASC LIMIT 1");
-                    $stmt2->execute([$customer_id, $cur['sort_order']]);
-                }
-                $adj = $stmt2->fetch();
-                if ($adj) {
-                    // 交换sort_order
-                    $pdo->beginTransaction();
-                    $pdo->prepare("UPDATE contact SET sort_order=? WHERE id=?")->execute([$adj['sort_order'], $cur['id']]);
-                    $pdo->prepare("UPDATE contact SET sort_order=? WHERE id=?")->execute([$cur['sort_order'], $adj['id']]);
-                    $pdo->commit();
-                    echo json_encode(['success' => true]);
-                    exit;
-                }
-            }
-        }
-        echo json_encode(['success' => false]);
-        exit;
     }
 }
-
-// 获取分页参数
+// 分页参数
 $page = max(1, intval($_GET['page'] ?? $_POST['page'] ?? 1));
 $page_size = min(max(1, intval($_GET['page_size'] ?? $_POST['page_size'] ?? 10)), 100);
 $offset = ($page - 1) * $page_size;
-
-// 获取联系人总数
-$count_stmt = $pdo->prepare("SELECT COUNT(*) FROM contact WHERE customer_id=?");
-$count_stmt->execute([$customer_id]);
+// 总数
+$count_stmt = $pdo->prepare("SELECT COUNT(*) FROM agency_contact WHERE agency_id=?");
+$count_stmt->execute([$agency_id]);
 $total_records = $count_stmt->fetchColumn();
 $total_pages = ceil($total_records / $page_size);
-
-// 获取当前页联系人
-$stmt = $pdo->prepare("SELECT * FROM contact WHERE customer_id=:customer_id ORDER BY sort_order ASC, id ASC LIMIT :offset, :limit");
-$stmt->bindValue(':customer_id', $customer_id, PDO::PARAM_INT);
+// 当前页数据
+$stmt = $pdo->prepare("SELECT * FROM agency_contact WHERE agency_id=:agency_id ORDER BY sort_order ASC, id ASC LIMIT :offset, :limit");
+$stmt->bindValue(':agency_id', $agency_id, PDO::PARAM_INT);
 $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->bindValue(':limit', $page_size, PDO::PARAM_INT);
 $stmt->execute();
 $contacts = $stmt->fetchAll();
-
 ?>
 <div class="module-panel">
     <div style="margin-bottom:12px;text-align:left;">
@@ -249,8 +207,16 @@ $contacts = $stmt->fetchAll();
         <h3 style="text-align:center;margin-bottom:18px;">联系人信息</h3>
         <form id="contact-form" class="module-form">
             <input type="hidden" name="id" value="0">
-            <input type="hidden" name="customer_id" value="<?= $customer_id ?>">
+            <input type="hidden" name="agency_id" value="<?= $agency_id ?>">
             <table class="module-table">
+                <tr>
+                    <td class="module-label">案件类型</td>
+                    <td colspan="5">
+                        <label style="margin-right:18px;"><input type="checkbox" name="case_type_patent" value="1"> 专利</label>
+                        <label style="margin-right:18px;"><input type="checkbox" name="case_type_trademark" value="1"> 商标</label>
+                        <label style="margin-right:18px;"><input type="checkbox" name="case_type_copyright" value="1"> 版权</label>
+                    </td>
+                </tr>
                 <tr>
                     <td class="module-label module-req">*姓名</td>
                     <td><input type="text" name="name" class="module-input" required></td>
@@ -281,7 +247,6 @@ $contacts = $stmt->fetchAll();
                     <td class="module-label module-req">*联系人类别</td>
                     <td>
                         <select name="contact_type" class="module-input" required>
-                            <option value="">--请选择--</option>
                             <?php foreach ($contact_types as $v): ?>
                                 <option value="<?= h($v) ?>"><?= h($v) ?></option>
                             <?php endforeach; ?>
@@ -308,7 +273,6 @@ $contacts = $stmt->fetchAll();
                     <td class="module-label">称呼</td>
                     <td>
                         <select name="salutation" class="module-input">
-                            <option value="">--请选择--</option>
                             <?php foreach ($salutations as $v): ?>
                                 <option value="<?= h($v) ?>"><?= h($v) ?></option>
                             <?php endforeach; ?>
@@ -329,12 +293,12 @@ $contacts = $stmt->fetchAll();
                     <td><input type="text" name="postcode" class="module-input"></td>
                 </tr>
                 <tr>
-                    <td class="module-label">案件类型</td>
-                    <td colspan="5">
-                        <label style="margin-right:18px;"><input type="checkbox" name="case_type_patent" value="1"> 专利</label>
-                        <label style="margin-right:18px;"><input type="checkbox" name="case_type_trademark" value="1"> 商标</label>
-                        <label style="margin-right:18px;"><input type="checkbox" name="case_type_copyright" value="1"> 版权</label>
-                    </td>
+                    <td class="module-label">历史地址</td>
+                    <td><input type="text" name="history_address" class="module-input"></td>
+                    <td class="module-label"></td>
+                    <td></td>
+                    <td class="module-label"></td>
+                    <td></td>
                 </tr>
             </table>
             <div style="text-align:center;margin-top:12px;">
@@ -371,7 +335,7 @@ $contacts = $stmt->fetchAll();
             addBtn.onclick = function() {
                 showModal({
                     id: 0,
-                    customer_id: form.customer_id.value,
+                    agency_id: form.agency_id.value,
                     name: '',
                     mobile: '',
                     position: '',
@@ -395,6 +359,7 @@ $contacts = $stmt->fetchAll();
                     case_type_patent: 0,
                     case_type_trademark: 0,
                     case_type_copyright: 0,
+                    history_address: ''
                 });
             };
             closeBtn.onclick = hideModal;
@@ -408,8 +373,8 @@ $contacts = $stmt->fetchAll();
                     var fd = new FormData();
                     fd.append('action', 'get');
                     fd.append('id', id);
-                    fd.append('customer_id', form.customer_id.value);
-                    xhr.open('POST', 'modules/customer_management/customer/customer_tabs/contact.php', true);
+                    fd.append('agency_id', form.agency_id.value);
+                    xhr.open('POST', 'modules/customer_management/agency/agency_tabs/contact.php', true);
                     xhr.onload = function() {
                         try {
                             var res = JSON.parse(xhr.responseText);
@@ -426,17 +391,16 @@ $contacts = $stmt->fetchAll();
                     var fd = new FormData();
                     fd.append('action', 'delete');
                     fd.append('id', id);
-                    fd.append('customer_id', form.customer_id.value);
-                    xhr.open('POST', 'modules/customer_management/customer/customer_tabs/contact.php', true);
+                    fd.append('agency_id', form.agency_id.value);
+                    xhr.open('POST', 'modules/customer_management/agency/agency_tabs/contact.php', true);
                     xhr.onload = function() {
                         try {
                             var res = JSON.parse(xhr.responseText);
                             if (res.success) {
-                                // 只刷新tab内容，不刷新全页
-                                var tabContent = window.parent && window.parent.document.getElementById('customer-tab-content');
+                                var tabContent = window.parent && window.parent.document.getElementById('agency-tab-content');
                                 if (tabContent) {
                                     var xhr2 = new XMLHttpRequest();
-                                    xhr2.open('GET', 'modules/customer_management/customer/customer_tabs/contact.php?customer_id=' + form.customer_id.value, true);
+                                    xhr2.open('GET', 'modules/customer_management/agency/agency_tabs/contact.php?agency_id=' + form.agency_id.value, true);
                                     xhr2.onload = function() {
                                         tabContent.innerHTML = xhr2.responseText;
                                         setTimeout(bindContactEvents, 0);
@@ -457,17 +421,17 @@ $contacts = $stmt->fetchAll();
                     var fd = new FormData();
                     fd.append('action', 'move');
                     fd.append('id', id);
-                    fd.append('customer_id', form.customer_id.value);
+                    fd.append('agency_id', form.agency_id.value);
                     fd.append('direction', direction);
-                    xhr.open('POST', 'modules/customer_management/customer/customer_tabs/contact.php', true);
+                    xhr.open('POST', 'modules/customer_management/agency/agency_tabs/contact.php', true);
                     xhr.onload = function() {
                         try {
                             var res = JSON.parse(xhr.responseText);
                             if (res.success) {
-                                var tabContent = window.parent && window.parent.document.getElementById('customer-tab-content');
+                                var tabContent = window.parent && window.parent.document.getElementById('agency-tab-content');
                                 if (tabContent) {
                                     var xhr2 = new XMLHttpRequest();
-                                    xhr2.open('GET', 'modules/customer_management/customer/customer_tabs/contact.php?customer_id=' + form.customer_id.value, true);
+                                    xhr2.open('GET', 'modules/customer_management/agency/agency_tabs/contact.php?agency_id=' + form.agency_id.value, true);
                                     xhr2.onload = function() {
                                         tabContent.innerHTML = xhr2.responseText;
                                         setTimeout(bindContactEvents, 0);
@@ -491,15 +455,15 @@ $contacts = $stmt->fetchAll();
                 fd.set('case_type_copyright', form.case_type_copyright.checked ? 1 : 0);
                 fd.append('action', 'save');
                 var xhr = new XMLHttpRequest();
-                xhr.open('POST', 'modules/customer_management/customer/customer_tabs/contact.php', true);
+                xhr.open('POST', 'modules/customer_management/agency/agency_tabs/contact.php', true);
                 xhr.onload = function() {
                     try {
                         var res = JSON.parse(xhr.responseText);
                         if (res.success) {
-                            var tabContent = window.parent && window.parent.document.getElementById('customer-tab-content');
+                            var tabContent = window.parent && window.parent.document.getElementById('agency-tab-content');
                             if (tabContent) {
                                 var xhr2 = new XMLHttpRequest();
-                                xhr2.open('GET', 'modules/customer_management/customer/customer_tabs/contact.php?customer_id=' + form.customer_id.value, true);
+                                xhr2.open('GET', 'modules/customer_management/agency/agency_tabs/contact.php?agency_id=' + form.agency_id.value, true);
                                 xhr2.onload = function() {
                                     tabContent.innerHTML = xhr2.responseText;
                                     setTimeout(bindContactEvents, 0);
@@ -525,11 +489,11 @@ $contacts = $stmt->fetchAll();
             var pageInput = document.getElementById('contact-page-input');
             var btnPageJump = document.getElementById('contact-btn-page-jump');
             var totalPages = parseInt(document.getElementById('contact-total-pages').textContent) || 1;
-            var customerId = document.querySelector('[name=customer_id]').value;
+            var agencyId = document.querySelector('[name=agency_id]').value;
 
             function loadContactPage(page, pageSize) {
-                var tabContent = window.parent && window.parent.document.getElementById('customer-tab-content');
-                var url = 'modules/customer_management/customer/customer_tabs/contact.php?customer_id=' + customerId + '&page=' + page + '&page_size=' + pageSize;
+                var tabContent = window.parent && window.parent.document.getElementById('agency-tab-content');
+                var url = 'modules/customer_management/agency/agency_tabs/contact.php?agency_id=' + agencyId + '&page=' + page + '&page_size=' + pageSize;
                 var xhr = new XMLHttpRequest();
                 xhr.open('GET', url, true);
                 xhr.onload = function() {
@@ -564,7 +528,6 @@ $contacts = $stmt->fetchAll();
                 loadContactPage(page, pageSizeSelect.value);
             };
         }
-        // 首次绑定
         bindContactEvents();
     })();
 </script>
