@@ -65,3 +65,31 @@ CREATE TABLE `user_email_account` (
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '用户邮箱账户设置';
+
+-- 部门表，支持多级分级结构
+CREATE TABLE `department` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `parent_id` INT(11) DEFAULT NULL COMMENT '上级部门ID，根部门为NULL',
+    `dept_name` VARCHAR(100) NOT NULL COMMENT '部门名称',
+    `dept_short_name` VARCHAR(50) DEFAULT NULL COMMENT '部门简称',
+    `dept_code` VARCHAR(50) DEFAULT NULL COMMENT '部门编号',
+    `leader_id` INT(11) DEFAULT NULL COMMENT '部门负责人ID，关联user表',
+    `is_main` TINYINT(1) DEFAULT 0 COMMENT '是否为本所部门(1是0否)',
+    `is_active` TINYINT(1) DEFAULT 1 COMMENT '是否有效(1是0否)',
+    `sort_order` INT(11) DEFAULT 0 COMMENT '排序号',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_parent_id` (`parent_id`),
+    KEY `idx_leader_id` (`leader_id`),
+    CONSTRAINT `fk_department_leader` FOREIGN KEY (`leader_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门表，支持多级分级结构';
+
+-- 部门与用户多对多关系表
+CREATE TABLE `department_user` (
+    `department_id` INT(11) NOT NULL,
+    `user_id` INT(11) NOT NULL,
+    PRIMARY KEY (`department_id`, `user_id`),
+    CONSTRAINT `fk_dept_user_dept` FOREIGN KEY (`department_id`) REFERENCES `department`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dept_user_user` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '部门与用户多对多关系表';
