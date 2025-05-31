@@ -133,6 +133,12 @@ if (!isset($_SESSION['user_id'])) {
                         title: '案件管理',
                         icon: '📁',
                         sub: ['专利查询', '期限监控', '流程监控', '专利来文', '文件管理']
+                    },
+                    {
+                        title: '专利编辑',
+                        icon: '✏️',
+                        sub: [],
+                        hidden: true
                     }
                 ]
             },
@@ -279,7 +285,7 @@ if (!isset($_SESSION['user_id'])) {
                 // 客户管理
                 ['crm', 'customer', 'agency', 'contract_management'],
                 // 专利管理
-                ['add_patent', 'personal_cases', 'case_assignment', 'review_management', 'submission_management', 'case_management'],
+                ['add_patent', 'personal_cases', 'case_assignment', 'review_management', 'submission_management', 'case_management', 'edit_patent'],
                 // 商标管理
                 ['add_trademark', 'personal_cases', 'submission_management', 'case_management'],
                 // 版权管理
@@ -309,7 +315,8 @@ if (!isset($_SESSION['user_id'])) {
                     ['pending_assignment', 'assigned'],
                     ['draft', 'pending_review', 'under_review', 'completed', 'export_review_package'],
                     ['pending', 'under_review', 'completed'],
-                    ['patent_search', 'deadline_monitoring', 'process_monitoring', 'patent_incoming', 'file_management']
+                    ['patent_search', 'deadline_monitoring', 'process_monitoring', 'patent_incoming', 'file_management'],
+                    ['edit_patent']
                 ],
                 // 商标管理
                 [
@@ -350,11 +357,11 @@ if (!isset($_SESSION['user_id'])) {
             const moduleDir = moduleDirs[moduleIndex];
             const menuDir = menuDirs[moduleIndex][menuIndex];
             // 一级菜单无二级菜单，且README.md要求直接在模块目录下的特殊情况
-            // 专利管理-新增专利、商标管理-新增商标、版权管理-新增版权、发文管理-发文管理/邮箱管理-邮件分析
+            // 专利管理-新增专利、专利管理-专利编辑、商标管理-新增商标、版权管理-新增版权、发文管理-发文管理/邮箱管理-邮件分析
             if (subIndex === null) {
                 // 这些一级菜单直接在模块目录下
                 if (
-                    (moduleDir === 'patent_management' && menuDir === 'add_patent') ||
+                    (moduleDir === 'patent_management' && (menuDir === 'add_patent' || menuDir === 'edit_patent')) ||
                     (moduleDir === 'trademark_management' && menuDir === 'add_trademark') ||
                     (moduleDir === 'copyright_management' && menuDir === 'add_copyright')
                 ) {
@@ -562,6 +569,7 @@ if (!isset($_SESSION['user_id'])) {
             sidebar.innerHTML = '';
             const menus = modules[moduleIndex].menus;
             menus.forEach((menu, idx) => {
+                if (menu.hidden) return; // 跳过隐藏菜单项
                 // 一级菜单
                 const li = document.createElement('li');
                 li.className = 'menu-item';

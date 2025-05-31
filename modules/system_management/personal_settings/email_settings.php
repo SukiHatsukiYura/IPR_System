@@ -1,4 +1,7 @@
 <?php
+// 开启输出缓冲，确保AJAX请求只返回JSON
+ob_start();
+
 // 邮件设置功能 - 系统管理/个人设置模块下的邮件设置功能
 
 include_once(__DIR__ . '/../../../database.php');
@@ -39,6 +42,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
         }
+        // 必填校验通过后，进行端口等特定字段的类型校验
+        if (!is_numeric($data['imap_port'])) {
+            echo json_encode(['success' => false, 'msg' => 'IMAP端口必须是数字']);
+            exit;
+        }
+        if (!is_numeric($data['smtp_port'])) {
+            echo json_encode(['success' => false, 'msg' => 'SMTP端口必须是数字']);
+            exit;
+        }
         $data['is_default'] = $data['is_default'] ? 1 : 0;
         if ($id > 0) {
             // 更新
@@ -52,8 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt2 = $pdo->prepare('SELECT * FROM user_email_account WHERE id=? AND user_id=?');
                 $stmt2->execute([$id, $user_id]);
                 $row = $stmt2->fetch();
+                // 清空并关闭输出缓冲区，只输出JSON
+                ob_clean();
                 echo json_encode(['success' => true, 'data' => $row]);
             } else {
+                // 清空并关闭输出缓冲区，只输出JSON
+                ob_clean();
                 echo json_encode(['success' => false]);
             }
             exit;
@@ -69,8 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt2 = $pdo->prepare('SELECT * FROM user_email_account WHERE id=? AND user_id=?');
                 $stmt2->execute([$newid, $user_id]);
                 $row = $stmt2->fetch();
+                // 清空并关闭输出缓冲区，只输出JSON
+                ob_clean();
                 echo json_encode(['success' => true, 'data' => $row]);
             } else {
+                // 清空并关闭输出缓冲区，只输出JSON
+                ob_clean();
                 echo json_encode(['success' => false]);
             }
             exit;
@@ -80,6 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($id > 0) {
             $stmt = $pdo->prepare('DELETE FROM user_email_account WHERE id=? AND user_id=?');
             $ok = $stmt->execute([$id, $user_id]);
+            // 清空并关闭输出缓冲区，只输出JSON
+            ob_clean();
             echo json_encode(['success' => $ok]);
         } else {
             echo json_encode(['success' => false]);
@@ -92,14 +114,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$id, $user_id]);
             $row = $stmt->fetch();
             if ($row) {
+                // 清空并关闭输出缓冲区，只输出JSON
+                ob_clean();
                 echo json_encode(['success' => true, 'data' => $row]);
                 exit;
             }
         }
+        // 清空并关闭输出缓冲区，只输出JSON
+        ob_clean();
         echo json_encode(['success' => false]);
         exit;
     }
     // 预留：测试发信
+    // 清空并关闭输出缓冲区，只输出JSON
+    ob_clean();
     echo json_encode(['success' => false, 'msg' => '暂未实现']);
     exit;
 }
@@ -107,6 +135,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $stmt = $pdo->prepare('SELECT * FROM user_email_account WHERE user_id=? ORDER BY is_default DESC, id ASC');
 $stmt->execute([$user_id]);
 $email_accounts = $stmt->fetchAll();
+
+// 如果不是POST请求，或者POST请求不是保存/删除/获取，则输出页面内容
+ob_end_flush(); // 输出缓冲区内容
 ?>
 <div class="module-panel">
     <div class="module-btns">
@@ -352,6 +383,7 @@ $email_accounts = $stmt->fetchAll();
                         var res = JSON.parse(xhr.responseText);
                         if (res.success && res.data) {
                             alert('保存成功');
+                            console.log('保存成功，响应数据:', res.data);
                             form.style.display = 'none';
                             form.reset();
                             selectedId = null;
@@ -359,37 +391,67 @@ $email_accounts = $stmt->fetchAll();
                             btnDelete.disabled = true;
                             btnTest.disabled = true;
                             // 动态增/改表格行
+                            console.log('开始更新/添加表格行');
                             var table = document.querySelector('.email-list-area table');
                             var row = res.data;
                             var existTr = table.querySelector('tr[data-id="' + row.id + '"]');
-                            var html = '<td>' + escapeHtml(row.imap_server) + '</td>' +
-                                '<td>' + escapeHtml(row.imap_port) + '</td>' +
-                                '<td>' + escapeHtml(row.smtp_server) + '</td>' +
-                                '<td>' + escapeHtml(row.smtp_port) + '</td>' +
-                                '<td>' + escapeHtml(row.receive_email) + '</td>' +
-                                '<td>' + escapeHtml(row.send_email) + '</td>' +
-                                '<td>' + (row.is_default == 1 ? '是' : '否') + '</td>';
                             if (existTr) {
-                                existTr.innerHTML = html;
+                                console.log('更新现有行:', existTr);
+                                var fields = ['imap_server', 'imap_port', 'smtp_server', 'smtp_port', 'receive_email', 'send_email'];
+                                fields.forEach(function(field) {
+                                    var td = existTr.querySelector('td[data-field="' + field + '"]');
+                                    if (td) {
+                                        td.textContent = escapeHtml(row[field]);
+                                    }
+                                });
+                                var tdIsDefault = existTr.querySelector('td:nth-child(7)');
+                                if (tdIsDefault) {
+                                    tdIsDefault.textContent = row.is_default == 1 ? '是' : '否';
+                                }
+                                console.log('更新现有行完毕');
                             } else {
-                                // 新建插入到表格第二行（第一行为表头）
+                                console.log('新增行:', row);
                                 var tr = document.createElement('tr');
                                 tr.setAttribute('data-id', row.id);
-                                tr.innerHTML = html;
-                                if (table.rows.length > 1) {
-                                    table.insertBefore(tr, table.rows[1]);
-                                } else {
+                                var fields = ['imap_server', 'imap_port', 'smtp_server', 'smtp_port', 'receive_email', 'send_email'];
+                                fields.forEach(function(field) {
+                                    var td = document.createElement('td');
+                                    td.textContent = escapeHtml(row[field]);
+                                    tr.appendChild(td);
+                                });
+                                var tdIsDefault = document.createElement('td');
+                                tdIsDefault.textContent = row.is_default == 1 ? '是' : '否';
+                                tr.appendChild(tdIsDefault);
+                                console.log('新增行DOM元素构建完毕');
+                                if (table) {
+                                    console.log('执行 appendChild 插入 (到末尾)');
                                     table.appendChild(tr);
+                                    console.log('新增行已添加到末尾');
+                                    // 检查并移除"无数据"行
+                                    var nodata = table.querySelector('tr td[colspan]');
+                                    if (nodata) {
+                                        console.log('移除无数据行:', nodata);
+                                        // 使用 removeChild 移除整个"无数据"行
+                                        var nodataRow = nodata.parentNode; // 获取父级tr
+                                        if (nodataRow) {
+                                            nodataRow.parentNode.removeChild(nodataRow); // 从tr的父级（tbody或table）中移除tr
+                                            console.log('移除无数据行完毕'); // 添加日志
+                                        } else {
+                                            console.log('错误：无法获取无数据行的父级'); // 添加错误日志
+                                        }
+                                    }
+                                } else {
+                                    console.log('错误：无法获取表格元素');
                                 }
-                                // 移除"无数据"行
-                                var nodata = table.querySelector('tr td[colspan]');
-                                if (nodata) nodata.parentNode.remove();
                             }
+                            console.log('表格行更新/添加逻辑执行完毕');
                         } else {
+                            console.log('保存失败，服务器返回success: false', res);
                             alert(res.msg || '保存失败');
                         }
                     } catch (e) {
-                        alert('保存失败');
+                        console.error('保存失败，JSON解析或处理错误:', e, '响应文本:', xhr.responseText);
+                        alert('保存失败：' + xhr.responseText);
                     }
                 }
             };

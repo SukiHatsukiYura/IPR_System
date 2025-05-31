@@ -58,6 +58,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             'sort_order' => intval($_POST['sort_order'] ?? 0),
             'dept_code' => trim($_POST['dept_code'] ?? ''),
         ];
+        if ($data['leader_id'] === 0) {
+            $data['leader_id'] = NULL;
+        }
         if ($data['dept_name'] === '') {
             echo json_encode(['success' => false, 'msg' => '请填写部门名称']);
             exit;
@@ -382,7 +385,7 @@ function h($v)
                                     var res2 = JSON.parse(xhr2.responseText);
                                     if (res2.success) {
                                         alert('删除成功');
-                                        location.reload();
+                                        refreshDeptTreeAndDetail();
                                     } else {
                                         alert(res2.msg || '删除失败');
                                     }
@@ -499,6 +502,16 @@ function h($v)
                         detailArea.innerHTML = newDetail.innerHTML;
                     } else {
                         detailArea.innerHTML = '请选择左侧部门节点';
+                    }
+                    // *** 新增：更新弹窗中的上级部门下拉框选项 ***
+                    var newParentSelect = tempDiv.querySelector('#parent-dept-select');
+                    var currentParentSelect = document.getElementById('parent-dept-select');
+                    if (newParentSelect && currentParentSelect) {
+                        // 保留当前选中的值，以便更新后尝试重新选中
+                        var selectedValue = currentParentSelect.value;
+                        currentParentSelect.innerHTML = newParentSelect.innerHTML;
+                        // 尝试重新选中之前的值
+                        currentParentSelect.value = selectedValue;
                     }
                     // 重新绑定事件
                     // 选中节点高亮

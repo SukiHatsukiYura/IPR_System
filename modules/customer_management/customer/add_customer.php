@@ -2,6 +2,7 @@
 // 新增/编辑客户功能 - 客户管理/客户模块下的客户管理功能
 
 include_once(__DIR__ . '/../../../database.php');
+include_once(__DIR__ . '/../../../common/functions.php'); // 引入通用函数库
 check_access_via_framework();
 session_start();
 if (!isset($_SESSION['user_id'])) {
@@ -79,6 +80,24 @@ $customer_sources = [
 
 // 所属行业
 $industry_options = ['地产', '制造业', '互联网', '金融', '教育', '医疗', '能源', '交通', '物流', '建筑', '传媒', '农业', '旅游', '政府', '军工', '其他'];
+
+// 格式化用户数据为通用下拉框函数所需格式
+$users_options = [];
+foreach ($users as $user) {
+    $users_options[$user['id']] = $user['real_name'];
+}
+
+// 格式化行业数据为通用下拉框函数所需格式
+$industry_options_assoc = [];
+foreach ($industry_options as $industry) {
+    $industry_options_assoc[$industry] = $industry;
+}
+
+// 格式化客户来源数据为通用下拉框函数所需格式
+$customer_sources_options = [];
+foreach ($customer_sources as $source) {
+    $customer_sources_options[$source] = $source;
+}
 
 // 处理表单提交
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save') {
@@ -236,34 +255,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
-function h($v)
-{
-    return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8');
-}
-function render_user_search($name, $users, $post_val)
-{
-    global $_SESSION;
-    if ($name === 'business_staff_id' || $name === 'process_staff_id') {
-        $val = isset($_POST[$name]) ? intval($_POST[$name]) : (isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0);
-    } else {
-        $val = isset($_POST[$name]) ? intval($_POST[$name]) : 0;
-    }
-    $display = '';
-    foreach ($users as $u) {
-        if ($u['id'] == $val) {
-            $display = htmlspecialchars($u['real_name'], ENT_QUOTES, 'UTF-8');
-            break;
-        }
-    }
-    return '<div class="module-select-search-box">'
-        . '<input type="text" class="module-input module-select-search-input" name="' . $name . '_display' . '" value="' . $display . '" readonly placeholder="点击选择" data-realname="' . $display . '">'
-        . '<input type="hidden" name="' . $name . '" value="' . ($val ? $val : '') . '">'
-        . '<div class="module-select-search-list" style="display:none;">'
-        .   '<input type="text" class="module-select-search-list-input" placeholder="搜索姓名">'
-        .   '<div class="module-select-search-list-items"></div>'
-        . '</div>'
-        . '</div>';
-}
+// 输出下拉框所需JS资源
+render_select_search_assets();
 ?>
 <div class="module-panel">
     <div class="module-btns">
@@ -293,47 +286,37 @@ function render_user_search($name, $users, $post_val)
                 <td><input type="text" name="customer_name_en" class="module-input" value="<?= $is_edit_mode ? h($customer['customer_name_en']) : h($_POST['customer_name_en'] ?? '') ?>"></td>
                 <td class="module-label">新申请配案主管：</td>
                 <td>
-                    <?= render_user_search('new_case_manager_id', $users, $is_edit_mode ? $customer['new_case_manager_id'] : ($_POST['new_case_manager_id'] ?? '')) ?>
+                    <?php render_select_search('new_case_manager_id', $users_options, $is_edit_mode ? $customer['new_case_manager_id'] : ($_POST['new_case_manager_id'] ?? '')); ?>
                 </td>
             </tr>
             <tr>
                 <td class="module-label">邮件：</td>
-                <td><input type="email" name="email" class="module-input" value="<?= h($_POST['email'] ?? '') ?>"></td>
+                <td><input type="email" name="email" class="module-input" value="<?= $is_edit_mode ? h($customer['email']) : h($_POST['email'] ?? '') ?>"></td>
                 <td class="module-label">电话：</td>
-                <td><input type="text" name="phone" class="module-input" value="<?= h($_POST['phone'] ?? '') ?>"></td>
+                <td><input type="text" name="phone" class="module-input" value="<?= $is_edit_mode ? h($customer['phone']) : h($_POST['phone'] ?? '') ?>"></td>
                 <td class="module-label">传真：</td>
-                <td><input type="text" name="fax" class="module-input" value="<?= h($_POST['fax'] ?? '') ?>"></td>
+                <td><input type="text" name="fax" class="module-input" value="<?= $is_edit_mode ? h($customer['fax']) : h($_POST['fax'] ?? '') ?>"></td>
             </tr>
             <tr>
                 <td class="module-label">业务人员：</td>
                 <td>
-                    <?= render_user_search('business_staff_id', $users, $_POST['business_staff_id'] ?? '') ?>
+                    <?php render_select_search('business_staff_id', $users_options, $is_edit_mode ? $customer['business_staff_id'] : ($_POST['business_staff_id'] ?? $_SESSION['user_id'])); ?>
                 </td>
                 <td class="module-label">所属行业：</td>
                 <td>
-                    <div class="module-select-search-multi-box">
-                        <input type="text" class="module-input module-select-search-multi-input" name="industry_display" readonly placeholder="请选择/搜索行业" value="<?= h($_POST['industry'] ?? '') ?>">
-                        <input type="hidden" name="industry" value="<?= h($_POST['industry'] ?? '') ?>">
-                        <div class="module-select-search-multi-list" style="display:none;">
-                            <input type="text" class="module-select-search-multi-list-input" placeholder="搜索行业">
-                            <div class="module-select-search-multi-list-ops"></div>
-                            <div class="module-select-search-multi-list-items"></div>
-                        </div>
-                    </div>
+                    <?php
+                    $selected_industries = $is_edit_mode ? explode(',', $customer['industry']) : (isset($_POST['industry']) ? explode(',', $_POST['industry']) : []);
+                    render_select_search_multi('industry', $industry_options_assoc, $selected_industries);
+                    ?>
                 </td>
                 <td class="module-label">客户来源：</td>
                 <td>
-                    <select name="customer_source" class="module-input">
-                        <option value="">--请选择--</option>
-                        <?php foreach ($customer_sources as $v): ?>
-                            <option value="<?= h($v) ?>" <?= (isset($_POST['customer_source']) && $_POST['customer_source'] == $v) ? 'selected' : '' ?>><?= h($v) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php render_select_search('customer_source', $customer_sources_options, $is_edit_mode ? $customer['customer_source'] : ($_POST['customer_source'] ?? '')); ?>
                 </td>
             </tr>
             <tr>
                 <td class="module-label">内部签署人：</td>
-                <td><input type="text" name="internal_signer" class="module-input" value="<?= h($_POST['internal_signer'] ?? '') ?>"></td>
+                <td><input type="text" name="internal_signer" class="module-input" value="<?= $is_edit_mode ? h($customer['internal_signer']) : h($_POST['internal_signer'] ?? '') ?>"></td>
                 <td class="module-label">创建人：</td>
                 <td><input type="text" class="module-input" value="<?= h($_SESSION['username']) ?>" readonly></td>
                 <td class="module-label">创建日期：</td>
@@ -341,21 +324,21 @@ function render_user_search($name, $users, $post_val)
             </tr>
             <tr>
                 <td class="module-label">外部签署人：</td>
-                <td><input type="text" name="external_signer" class="module-input" value="<?= h($_POST['external_signer'] ?? '') ?>"></td>
+                <td><input type="text" name="external_signer" class="module-input" value="<?= $is_edit_mode ? h($customer['external_signer']) : h($_POST['external_signer'] ?? '') ?>"></td>
                 <td class="module-label">内部签署人电话：</td>
-                <td><input type="text" name="internal_signer_phone" class="module-input" value="<?= h($_POST['internal_signer_phone'] ?? '') ?>"></td>
+                <td><input type="text" name="internal_signer_phone" class="module-input" value="<?= $is_edit_mode ? h($customer['internal_signer_phone']) : h($_POST['internal_signer_phone'] ?? '') ?>"></td>
                 <td class="module-label">内部签署人邮箱：</td>
-                <td><input type="email" name="internal_signer_email" class="module-input" value="<?= h($_POST['internal_signer_email'] ?? '') ?>"></td>
+                <td><input type="email" name="internal_signer_email" class="module-input" value="<?= $is_edit_mode ? h($customer['internal_signer_email']) : h($_POST['internal_signer_email'] ?? '') ?>"></td>
             </tr>
             <tr>
                 <td class="module-label">流程人员：</td>
                 <td>
-                    <?= render_user_search('process_staff_id', $users, $_POST['process_staff_id'] ?? '') ?>
+                    <?php render_select_search('process_staff_id', $users_options, $is_edit_mode ? $customer['process_staff_id'] : ($_POST['process_staff_id'] ?? $_SESSION['user_id'])); ?>
                 </td>
                 <td class="module-label">外部签署人电话：</td>
-                <td><input type="text" name="external_signer_phone" class="module-input" value="<?= h($_POST['external_signer_phone'] ?? '') ?>"></td>
+                <td><input type="text" name="external_signer_phone" class="module-input" value="<?= $is_edit_mode ? h($customer['external_signer_phone']) : h($_POST['external_signer_phone'] ?? '') ?>"></td>
                 <td class="module-label">外部签署人邮箱：</td>
-                <td><input type="email" name="external_signer_email" class="module-input" value="<?= h($_POST['external_signer_email'] ?? '') ?>"></td>
+                <td><input type="email" name="external_signer_email" class="module-input" value="<?= $is_edit_mode ? h($customer['external_signer_email']) : h($_POST['external_signer_email'] ?? '') ?>"></td>
             </tr>
             <tr>
                 <td class="module-label">客户等级：</td>
@@ -363,37 +346,37 @@ function render_user_search($name, $users, $post_val)
                     <select name="customer_level" class="module-input" required>
                         <option value="">--请选择--</option>
                         <?php foreach ($customer_levels as $v): ?>
-                            <option value="<?= h($v) ?>" <?= (isset($_POST['customer_level']) && $_POST['customer_level'] == $v) ? 'selected' : '' ?>><?= h($v) ?></option>
+                            <option value="<?= h($v) ?>" <?= $is_edit_mode && $customer['customer_level'] == $v ? 'selected' : ((isset($_POST['customer_level']) && $_POST['customer_level'] == $v) ? 'selected' : '') ?>><?= h($v) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </td>
                 <td class="module-label">账单地址：</td>
-                <td><input type="text" name="billing_address" class="module-input" value="<?= h($_POST['billing_address'] ?? '') ?>"></td>
+                <td><input type="text" name="billing_address" class="module-input" value="<?= $is_edit_mode ? h($customer['billing_address']) : h($_POST['billing_address'] ?? '') ?>"></td>
                 <td class="module-label">收货地址：</td>
-                <td><input type="text" name="delivery_address" class="module-input" value="<?= h($_POST['delivery_address'] ?? '') ?>"></td>
+                <td><input type="text" name="delivery_address" class="module-input" value="<?= $is_edit_mode ? h($customer['delivery_address']) : h($_POST['delivery_address'] ?? '') ?>"></td>
             </tr>
             <tr>
                 <td class="module-label">地址：</td>
-                <td><input type="text" name="address" class="module-input" value="<?= h($_POST['address'] ?? '') ?>"></td>
+                <td><input type="text" name="address" class="module-input" value="<?= $is_edit_mode ? h($customer['address']) : h($_POST['address'] ?? '') ?>"></td>
                 <td class="module-label">信誉等级：</td>
                 <td>
                     <select name="credit_level" class="module-input">
                         <option value="">--请选择--</option>
-                        <option value="高度信誉" <?= (isset($_POST['credit_level']) && $_POST['credit_level'] == '高度信誉') ? 'selected' : '' ?>>高度信誉</option>
-                        <option value="中度信誉" <?= (isset($_POST['credit_level']) && $_POST['credit_level'] == '中度信誉') ? 'selected' : '' ?>>中度信誉</option>
-                        <option value="低度信誉" <?= (isset($_POST['credit_level']) && $_POST['credit_level'] == '低度信誉') ? 'selected' : '' ?>>低度信誉</option>
+                        <option value="高度信誉" <?= $is_edit_mode && $customer['credit_level'] == '高度信誉' ? 'selected' : ((isset($_POST['credit_level']) && $_POST['credit_level'] == '高度信誉') ? 'selected' : '') ?>>高度信誉</option>
+                        <option value="中度信誉" <?= $is_edit_mode && $customer['credit_level'] == '中度信誉' ? 'selected' : ((isset($_POST['credit_level']) && $_POST['credit_level'] == '中度信誉') ? 'selected' : '') ?>>中度信誉</option>
+                        <option value="低度信誉" <?= $is_edit_mode && $customer['credit_level'] == '低度信誉' ? 'selected' : ((isset($_POST['credit_level']) && $_POST['credit_level'] == '低度信誉') ? 'selected' : '') ?>>低度信誉</option>
                     </select>
                 </td>
                 <td class="module-label">客户签约日期：</td>
-                <td><input type="date" name="sign_date" class="module-input" value="<?= h($_POST['sign_date'] ?? '') ?>"></td>
+                <td><input type="date" name="sign_date" class="module-input" value="<?= $is_edit_mode ? h($customer['sign_date']) : h($_POST['sign_date'] ?? '') ?>"></td>
             </tr>
             <tr>
                 <td class="module-label">开户银行：</td>
-                <td><input type="text" name="bank_name" class="module-input" value="<?= h($_POST['bank_name'] ?? '') ?>"></td>
+                <td><input type="text" name="bank_name" class="module-input" value="<?= $is_edit_mode ? h($customer['bank_name']) : h($_POST['bank_name'] ?? '') ?>"></td>
                 <td class="module-label">英文地址：</td>
-                <td><input type="text" name="address_en" class="module-input" value="<?= h($_POST['address_en'] ?? '') ?>"></td>
+                <td><input type="text" name="address_en" class="module-input" value="<?= $is_edit_mode ? h($customer['address_en']) : h($_POST['address_en'] ?? '') ?>"></td>
                 <td class="module-label">本所业务公共邮箱：</td>
-                <td><input type="email" name="public_email" class="module-input" value="<?= h($_POST['public_email'] ?? '') ?>"></td>
+                <td><input type="email" name="public_email" class="module-input" value="<?= $is_edit_mode ? h($customer['public_email']) : h($_POST['public_email'] ?? '') ?>"></td>
             </tr>
             <tr>
                 <td class="module-label">成交状态：</td>
@@ -401,19 +384,19 @@ function render_user_search($name, $users, $post_val)
                     <select name="deal_status" class="module-input">
                         <option value="">--请选择--</option>
                         <?php foreach ($deal_statuses as $v): ?>
-                            <option value="<?= h($v) ?>" <?= (isset($_POST['deal_status']) && $_POST['deal_status'] == $v) ? 'selected' : '' ?>><?= h($v) ?></option>
+                            <option value="<?= h($v) ?>" <?= $is_edit_mode && $customer['deal_status'] == $v ? 'selected' : ((isset($_POST['deal_status']) && $_POST['deal_status'] == $v) ? 'selected' : '') ?>><?= h($v) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </td>
                 <td class="module-label">银行账号：</td>
-                <td><input type="text" name="bank_account" class="module-input" value="<?= h($_POST['bank_account'] ?? '') ?>"></td>
+                <td><input type="text" name="bank_account" class="module-input" value="<?= $is_edit_mode ? h($customer['bank_account']) : h($_POST['bank_account'] ?? '') ?>"></td>
                 <td class="module-label">纳税人识别号：</td>
-                <td><input type="text" name="tax_id" class="module-input" value="<?= h($_POST['tax_id'] ?? '') ?>"></td>
+                <td><input type="text" name="tax_id" class="module-input" value="<?= $is_edit_mode ? h($customer['tax_id']) : h($_POST['tax_id'] ?? '') ?>"></td>
             </tr>
             <tr>
                 <td class="module-label">项目负责人：</td>
                 <td>
-                    <?= render_user_search('project_leader_id', $users, $is_edit_mode ? $customer['project_leader_id'] : ($_POST['project_leader_id'] ?? '')) ?>
+                    <?php render_select_search('project_leader_id', $users_options, $is_edit_mode ? $customer['project_leader_id'] : ($_POST['project_leader_id'] ?? '')); ?>
                 </td>
                 <td class="module-label module-req">*案件类型：</td>
                 <td colspan="3">
@@ -499,6 +482,7 @@ function render_user_search($name, $users, $post_val)
         var form = document.querySelector('.module-form');
         var btnSave = document.querySelector('.btn-save');
         var btnCancel = document.querySelector('.btn-cancel');
+
         // 保存按钮AJAX提交
         btnSave.onclick = function() {
             var required = ['customer_name_cn'];
@@ -529,6 +513,10 @@ function render_user_search($name, $users, $post_val)
                             alert('保存成功');
                             <?php if (!$is_edit_mode): ?>
                                 form.reset();
+                                // 重新初始化下拉框
+                                if (typeof window.initSelectSearchControls === 'function') {
+                                    window.initSelectSearchControls();
+                                }
                             <?php else: ?>
                                 // 编辑模式成功后返回列表页
                                 if (confirm('编辑成功，是否返回客户列表？')) {
@@ -554,6 +542,7 @@ function render_user_search($name, $users, $post_val)
             };
             xhr.send(fd);
         };
+
         btnCancel.onclick = function() {
             <?php if ($is_edit_mode): ?>
                 // 编辑模式取消返回列表页
@@ -566,116 +555,18 @@ function render_user_search($name, $users, $post_val)
                 }
             <?php else: ?>
                 form.reset();
+                // 重新初始化下拉框
+                if (typeof window.initSelectSearchControls === 'function') {
+                    window.initSelectSearchControls();
+                }
             <?php endif; ?>
         };
-        // 用户搜索下拉
-        var userData = <?php echo json_encode($users, JSON_UNESCAPED_UNICODE); ?>;
 
-        function bindUserSearch(box) {
-            var input = box.querySelector('.module-select-search-input');
-            var hidden = box.querySelector('input[type=hidden]');
-            var list = box.querySelector('.module-select-search-list');
-            var searchInput = list.querySelector('.module-select-search-list-input');
-            var itemsDiv = list.querySelector('.module-select-search-list-items');
-
-            function renderList(filter) {
-                var html = '';
-                var found = false;
-                userData.forEach(function(u) {
-                    if (!filter || u.real_name.indexOf(filter) !== -1) {
-                        html += '<div class="module-select-search-item" data-id="' + u.id + '">' + u.real_name + '</div>';
-                        found = true;
-                    }
-                });
-                if (!found) html = '<div class="no-match">无匹配</div>';
-                itemsDiv.innerHTML = html;
+        // 页面加载完成后初始化下拉框
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof window.initSelectSearchControls === 'function') {
+                window.initSelectSearchControls();
             }
-            input.addEventListener('click', function() {
-                renderList('');
-                list.style.display = 'block';
-                searchInput.value = '';
-                searchInput.focus();
-            });
-            searchInput.addEventListener('input', function() {
-                renderList(searchInput.value.trim());
-            });
-            document.addEventListener('click', function(e) {
-                if (!box.contains(e.target)) list.style.display = 'none';
-            });
-            itemsDiv.addEventListener('mousedown', function(e) {
-                var item = e.target.closest('.module-select-search-item');
-                if (item) {
-                    input.value = item.textContent;
-                    hidden.value = item.getAttribute('data-id');
-                    list.style.display = 'none';
-                }
-            });
-        }
-        document.querySelectorAll('.module-select-search-box').forEach(bindUserSearch);
-
-        // 多选行业下拉
-        var industryOptions = <?php echo json_encode($industry_options, JSON_UNESCAPED_UNICODE); ?>;
-        var multiBox = document.querySelector('.module-select-search-multi-box');
-        if (multiBox) {
-            var input = multiBox.querySelector('.module-select-search-multi-input');
-            var hidden = multiBox.querySelector('input[type=hidden]');
-            var list = multiBox.querySelector('.module-select-search-multi-list');
-            var searchInput = list.querySelector('.module-select-search-multi-list-input');
-            var opsDiv = list.querySelector('.module-select-search-multi-list-ops');
-            var itemsDiv = list.querySelector('.module-select-search-multi-list-items');
-            var selected = (hidden.value ? hidden.value.split(',') : []);
-
-            function renderList(filter) {
-                var htmlOps = '<div class="multi-ops"><button type="button" class="multi-all">全选</button><button type="button" class="multi-clear">清除</button></div>';
-                var htmlItems = '';
-                var found = false;
-                industryOptions.forEach(function(opt) {
-                    if (!filter || opt.indexOf(filter) !== -1) {
-                        htmlItems += '<div class="module-select-search-multi-item"><label><input type="checkbox" value="' + opt + '"' + (selected.indexOf(opt) !== -1 ? ' checked' : '') + '> ' + opt + '</label></div>';
-                        found = true;
-                    }
-                });
-                if (!found) htmlItems = '<div class="no-match">无匹配</div>';
-                opsDiv.innerHTML = htmlOps;
-                itemsDiv.innerHTML = htmlItems;
-            }
-            input.addEventListener('click', function() {
-                renderList('');
-                list.style.display = 'block';
-                searchInput.value = '';
-                searchInput.focus();
-            });
-            searchInput.addEventListener('input', function() {
-                renderList(searchInput.value.trim());
-            });
-            document.addEventListener('click', function(e) {
-                if (!multiBox.contains(e.target)) list.style.display = 'none';
-            });
-            itemsDiv.addEventListener('change', function(e) {
-                if (e.target.type === 'checkbox') {
-                    var vals = Array.from(itemsDiv.querySelectorAll('input[type=checkbox]:checked')).map(function(cb) {
-                        return cb.value;
-                    });
-                    selected = vals;
-                    input.value = vals.join(',');
-                    hidden.value = vals.join(',');
-                }
-            });
-            list.addEventListener('click', function(e) {
-                if (e.target.classList.contains('multi-all')) {
-                    e.stopPropagation();
-                    selected = industryOptions.slice();
-                    input.value = selected.join(',');
-                    hidden.value = selected.join(',');
-                    renderList(searchInput.value.trim());
-                } else if (e.target.classList.contains('multi-clear')) {
-                    e.stopPropagation();
-                    selected = [];
-                    input.value = '';
-                    hidden.value = '';
-                    renderList(searchInput.value.trim());
-                }
-            });
-        }
+        });
     })();
 </script>
