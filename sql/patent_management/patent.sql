@@ -56,7 +56,6 @@ CREATE TABLE `patent_case_extend_info` (
     `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
     `patent_case_info_id` INT(11) NOT NULL COMMENT '关联专利案件主表ID',
     `department_id` INT(11) DEFAULT NULL COMMENT '所属部门，关联department(id)',
-
     -- 第一列
     `original_application_no` VARCHAR(100) DEFAULT NULL COMMENT '原案申请号',
     `original_application_date` DATE DEFAULT NULL COMMENT '原案申请日',
@@ -69,8 +68,7 @@ CREATE TABLE `patent_case_extend_info` (
     `grant_notice_date` DATE DEFAULT NULL COMMENT '授权发文日',
     `cooperation_agency` VARCHAR(100) DEFAULT NULL COMMENT '协办所',
     `external_source_person` VARCHAR(100) DEFAULT NULL COMMENT '外部案源人',
-    `cost` DECIMAL(12,2) DEFAULT NULL COMMENT '成本',
-
+    `cost` DECIMAL(12, 2) DEFAULT NULL COMMENT '成本',
     -- 第二列
     `pct_application_no` VARCHAR(100) DEFAULT NULL COMMENT 'PCT申请号',
     `pct_application_date` DATE DEFAULT NULL COMMENT 'PCT申请日',
@@ -83,8 +81,7 @@ CREATE TABLE `patent_case_extend_info` (
     `new_application_submit_date` DATE DEFAULT NULL COMMENT '新申请递交日',
     `cooperation_agency_case_no` VARCHAR(100) DEFAULT NULL COMMENT '协办所案号',
     `internal_source_person` VARCHAR(100) DEFAULT NULL COMMENT '内部案源人',
-    `budget` DECIMAL(12,2) DEFAULT NULL COMMENT '预算',
-
+    `budget` DECIMAL(12, 2) DEFAULT NULL COMMENT '预算',
     -- 第三列
     `independent_claim_count` INT DEFAULT NULL COMMENT '独立权利要求项数',
     `claim_count` INT DEFAULT NULL COMMENT '权利要求项数',
@@ -98,13 +95,14 @@ CREATE TABLE `patent_case_extend_info` (
     `grant_date` DATE DEFAULT NULL COMMENT '授权日',
     `division` VARCHAR(100) DEFAULT NULL COMMENT '所属分部',
     `deferred_examination` VARCHAR(50) DEFAULT NULL COMMENT '延迟审查',
-
     PRIMARY KEY (`id`),
     KEY `idx_patent_case_info_id` (`patent_case_info_id`),
     KEY `idx_department_id` (`department_id`),
     CONSTRAINT `fk_extend_patent_case` FOREIGN KEY (`patent_case_info_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_extend_department` FOREIGN KEY (`department_id`) REFERENCES `department`(`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='专利案件扩展信息表';
+    CONSTRAINT `fk_extend_department` FOREIGN KEY (`department_id`) REFERENCES `department`(`id`) ON DELETE
+    SET
+        NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '专利案件扩展信息表';
 
 -- 修改专利案件扩展信息表的字段名
 -- 将 case_series 改为 case_coefficient (案件系数)
@@ -115,22 +113,18 @@ ALTER TABLE
 CREATE TABLE `patent_case_task` (
     `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
     `patent_case_info_id` INT(11) NOT NULL COMMENT '关联专利案件ID',
-    
     -- 基本信息
     `task_item` VARCHAR(200) NOT NULL COMMENT '处理事项',
     `task_status` VARCHAR(100) DEFAULT NULL COMMENT '处理状态',
     `case_stage` VARCHAR(100) DEFAULT NULL COMMENT '案件阶段',
-    
     -- 期限管理
     `internal_deadline` DATE DEFAULT NULL COMMENT '内部期限',
     `client_deadline` DATE DEFAULT NULL COMMENT '客户期限',
     `official_deadline` DATE DEFAULT NULL COMMENT '官方期限',
-    
     -- 人员管理
     `handler_id` INT(11) DEFAULT NULL COMMENT '处理人ID，关联user表',
     `external_handler_id` INT(11) DEFAULT NULL COMMENT '对外处理人ID，关联user表',
     `supervisor_id` INT(11) DEFAULT NULL COMMENT '核稿人ID，关联user表',
-    
     -- 日期管理
     `first_draft_date` DATE DEFAULT NULL COMMENT '初稿日',
     `final_draft_date` DATE DEFAULT NULL COMMENT '定稿日',
@@ -138,24 +132,20 @@ CREATE TABLE `patent_case_task` (
     `completion_date` DATE DEFAULT NULL COMMENT '完成日',
     `send_to_firm_date` DATE DEFAULT NULL COMMENT '送合作所日',
     `internal_final_date` DATE DEFAULT NULL COMMENT '内部定稿日',
-    
     -- 创建和修改信息
     `creator_id` INT(11) DEFAULT NULL COMMENT '创建人ID，关联user表',
     `creation_date` DATE DEFAULT NULL COMMENT '创建日期',
     `modifier_id` INT(11) DEFAULT NULL COMMENT '修改人ID，关联user表',
     `modification_date` DATE DEFAULT NULL COMMENT '修改日期',
-    
     -- 其他信息
     `is_urgent` TINYINT(1) DEFAULT 0 COMMENT '是否紧急 0否 1是',
     `task_rule_count` VARCHAR(20) DEFAULT NULL COMMENT '处理事项系数',
     `translation_word_count` INT DEFAULT NULL COMMENT '翻译字数',
     `contract_number` VARCHAR(100) DEFAULT NULL COMMENT '合同编号',
     `remarks` TEXT COMMENT '备注',
-    
     -- 系统字段
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    
     PRIMARY KEY (`id`),
     KEY `idx_patent_case_info_id` (`patent_case_info_id`),
     KEY `idx_handler_id` (`handler_id`),
@@ -164,12 +154,22 @@ CREATE TABLE `patent_case_task` (
     KEY `idx_creator_id` (`creator_id`),
     KEY `idx_modifier_id` (`modifier_id`),
     CONSTRAINT `fk_task_patent_case` FOREIGN KEY (`patent_case_info_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_task_handler` FOREIGN KEY (`handler_id`) REFERENCES `user`(`id`) ON DELETE SET NULL,
-    CONSTRAINT `fk_task_external_handler` FOREIGN KEY (`external_handler_id`) REFERENCES `user`(`id`) ON DELETE SET NULL,
-    CONSTRAINT `fk_task_supervisor` FOREIGN KEY (`supervisor_id`) REFERENCES `user`(`id`) ON DELETE SET NULL,
-    CONSTRAINT `fk_task_creator` FOREIGN KEY (`creator_id`) REFERENCES `user`(`id`) ON DELETE SET NULL,
-    CONSTRAINT `fk_task_modifier` FOREIGN KEY (`modifier_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='专利案件处理事项表';
+    CONSTRAINT `fk_task_handler` FOREIGN KEY (`handler_id`) REFERENCES `user`(`id`) ON DELETE
+    SET
+        NULL,
+        CONSTRAINT `fk_task_external_handler` FOREIGN KEY (`external_handler_id`) REFERENCES `user`(`id`) ON DELETE
+    SET
+        NULL,
+        CONSTRAINT `fk_task_supervisor` FOREIGN KEY (`supervisor_id`) REFERENCES `user`(`id`) ON DELETE
+    SET
+        NULL,
+        CONSTRAINT `fk_task_creator` FOREIGN KEY (`creator_id`) REFERENCES `user`(`id`) ON DELETE
+    SET
+        NULL,
+        CONSTRAINT `fk_task_modifier` FOREIGN KEY (`modifier_id`) REFERENCES `user`(`id`) ON DELETE
+    SET
+        NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '专利案件处理事项表';
 
 -- 处理事项附件表
 CREATE TABLE `patent_task_attachment` (
@@ -192,14 +192,15 @@ CREATE TABLE `patent_task_attachment` (
     KEY `idx_upload_user_id` (`upload_user_id`),
     CONSTRAINT `fk_attachment_task` FOREIGN KEY (`task_id`) REFERENCES `patent_case_task`(`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_attachment_patent_case` FOREIGN KEY (`patent_case_info_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_attachment_upload_user` FOREIGN KEY (`upload_user_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='处理事项附件表';
+    CONSTRAINT `fk_attachment_upload_user` FOREIGN KEY (`upload_user_id`) REFERENCES `user`(`id`) ON DELETE
+    SET
+        NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '处理事项附件表';
 
 -- 专利案件申请人关联表
 CREATE TABLE `patent_case_applicant` (
     `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
     `patent_case_info_id` INT(11) NOT NULL COMMENT '关联专利案件ID',
-    
     -- 基本信息
     `case_type` VARCHAR(50) DEFAULT NULL COMMENT '案件类型（专利/商标/版权，逗号分隔）',
     `applicant_type` VARCHAR(20) DEFAULT NULL COMMENT '申请人类型（个人/单位/其他）',
@@ -266,8 +267,10 @@ CREATE TABLE `patent_case_applicant_file` (
     KEY `idx_upload_user_id` (`upload_user_id`),
     CONSTRAINT `fk_patent_applicant_file_applicant` FOREIGN KEY (`patent_case_applicant_id`) REFERENCES `patent_case_applicant`(`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_patent_applicant_file_case` FOREIGN KEY (`patent_case_info_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_patent_applicant_file_user` FOREIGN KEY (`upload_user_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='专利案件申请人相关上传文件表';
+    CONSTRAINT `fk_patent_applicant_file_user` FOREIGN KEY (`upload_user_id`) REFERENCES `user`(`id`) ON DELETE
+    SET
+        NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '专利案件申请人相关上传文件表';
 
 -- 专利案件发明人关联表
 CREATE TABLE `patent_case_inventor` (
@@ -303,3 +306,31 @@ CREATE TABLE `patent_case_inventor` (
     KEY `idx_patent_case_info_id` (`patent_case_info_id`),
     CONSTRAINT `fk_patent_inventor_case` FOREIGN KEY (`patent_case_info_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '专利案件发明人关联表';
+
+-- 专利案件代理机构关联表
+CREATE TABLE `patent_case_agency` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `patent_case_info_id` INT(11) NOT NULL COMMENT '关联专利案件ID',
+    `agency_id` INT(11) NOT NULL COMMENT '关联代理机构ID',
+    `agency_agent_id` INT(11) DEFAULT NULL COMMENT '关联代理人ID',
+    `agency_contact_id` INT(11) DEFAULT NULL COMMENT '关联联系人ID',
+    `agency_name_cn` VARCHAR(200) DEFAULT NULL COMMENT '代理机构名称(中文)',
+    `agency_code` VARCHAR(100) DEFAULT NULL COMMENT '代理机构代码',
+    `agent_name_cn` VARCHAR(50) DEFAULT NULL COMMENT '代理人姓名(中文)',
+    `agent_license_no` VARCHAR(50) DEFAULT NULL COMMENT '代理人执业证号',
+    `contact_name` VARCHAR(50) DEFAULT NULL COMMENT '联系人姓名',
+    `contact_phone` VARCHAR(30) DEFAULT NULL COMMENT '联系人电话',
+    `contact_email` VARCHAR(100) DEFAULT NULL COMMENT '联系人邮箱',
+    `remark` TEXT COMMENT '备注',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_patent_case_info_id` (`patent_case_info_id`),
+    KEY `idx_agency_id` (`agency_id`),
+    KEY `idx_agency_agent_id` (`agency_agent_id`),
+    KEY `idx_agency_contact_id` (`agency_contact_id`),
+    CONSTRAINT `fk_patent_case_agency_case` FOREIGN KEY (`patent_case_info_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_patent_case_agency_agency` FOREIGN KEY (`agency_id`) REFERENCES `agency`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_patent_case_agency_agent` FOREIGN KEY (`agency_agent_id`) REFERENCES `agency_agent`(`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_patent_case_agency_contact` FOREIGN KEY (`agency_contact_id`) REFERENCES `agency_contact`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='专利案件代理机构关联表';

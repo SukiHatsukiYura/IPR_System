@@ -17,381 +17,11 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 if (!isset($_GET['patent_id']) || intval($_GET['patent_id']) <= 0) {
-    echo '<div style="color:#f44336;text-align:center;margin:40px;">未指定专利ID</div>';
+    echo '<div class="module-error">未指定专利ID</div>';
     exit;
 }
 $patent_id = intval($_GET['patent_id']);
 
-// 验证专利是否存在
-$patent_stmt = $pdo->prepare("SELECT id FROM patent_case_info WHERE id = ?");
-$patent_stmt->execute([$patent_id]);
-if (!$patent_stmt->fetch()) {
-    echo '<div style="color:#f44336;text-align:center;margin:40px;">未找到该专利信息</div>';
-    exit;
-}
-
-// 处理AJAX请求
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    header('Content-Type: application/json');
-
-    $action = $_POST['action'];
-
-    if ($action === 'get_applicant_list') {
-        try {
-            // 获取申请人列表
-            $sql = "SELECT * FROM patent_case_applicant WHERE patent_case_info_id = ? ORDER BY id ASC";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$patent_id]);
-            $rows = $stmt->fetchAll();
-
-            $html = '';
-            if (empty($rows)) {
-                $html = '<tr><td colspan="8" style="text-align:center;padding:20px 0;">暂无申请人数据</td></tr>';
-            } else {
-                foreach ($rows as $index => $a) {
-                    $area = htmlspecialchars(($a['province'] ?? '') . ($a['city_cn'] ? ' ' . $a['city_cn'] : '') . ($a['district'] ? ' ' . $a['district'] : ''));
-                    $html .= '<tr data-id="' . $a['id'] . '">' .
-                        '<td style="text-align:center;">' . ($index + 1) . '</td>' .
-                        '<td>' . htmlspecialchars($a['name_cn'] ?? '') . '</td>' .
-                        '<td>' . htmlspecialchars($a['applicant_type'] ?? '') . '</td>' .
-                        '<td>' . htmlspecialchars($a['entity_type'] ?? '') . '</td>' .
-                        '<td>' . $area . '</td>' .
-                        '<td>' . htmlspecialchars($a['phone'] ?? '') . '</td>' .
-                        '<td style="text-align:center;">' . ($a['is_first_contact'] ? '是' : '否') . '</td>' .
-                        '<td style="text-align:center;">' .
-                        '<button type="button" class="btn-mini btn-edit">✎</button>' .
-                        '<button type="button" class="btn-mini btn-del" style="color:#f44336;">✖</button>' .
-                        '</td>' .
-                        '</tr>';
-                }
-            }
-
-            echo json_encode([
-                'success' => true,
-                'html' => $html
-            ]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'msg' => '获取数据失败：' . $e->getMessage()]);
-        }
-        exit;
-    }
-
-    if ($action === 'get_applicant') {
-        try {
-            // 获取单个申请人信息
-            $id = intval($_POST['id'] ?? 0);
-            if ($id <= 0) {
-                echo json_encode(['success' => false, 'msg' => '无效的申请人ID']);
-                exit;
-            }
-
-            $stmt = $pdo->prepare("SELECT * FROM patent_case_applicant WHERE id = ? AND patent_case_info_id = ?");
-            $stmt->execute([$id, $patent_id]);
-            $data = $stmt->fetch();
-
-            if (!$data) {
-                echo json_encode(['success' => false, 'msg' => '未找到申请人信息']);
-                exit;
-            }
-
-            echo json_encode(['success' => true, 'data' => $data]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'msg' => '获取数据失败：' . $e->getMessage()]);
-        }
-        exit;
-    }
-
-    if ($action === 'save_applicant') {
-        try {
-            // 保存申请人信息
-            $id = intval($_POST['id'] ?? 0);
-
-            // 字段列表
-            $fields = [
-                'case_type',
-                'applicant_type',
-                'entity_type',
-                'name_cn',
-                'name_en',
-                'name_xing_cn',
-                'name_xing_en',
-                'is_first_contact',
-                'is_receipt_title',
-                'receipt_title',
-                'credit_code',
-                'contact_person',
-                'phone',
-                'email',
-                'province',
-                'city_cn',
-                'city_en',
-                'district',
-                'postcode',
-                'address_cn',
-                'address_en',
-                'department_cn',
-                'department_en',
-                'id_type',
-                'id_number',
-                'is_fee_reduction',
-                'fee_reduction_start',
-                'fee_reduction_end',
-                'fee_reduction_code',
-                'cn_agent_code',
-                'pct_agent_code',
-                'is_fee_monitor',
-                'country',
-                'nationality',
-                'business_license',
-                'remark'
-            ];
-
-            $data = ['patent_case_info_id' => $patent_id];
-
-            foreach ($fields as $field) {
-                if (isset($_POST[$field])) {
-                    $value = $_POST[$field];
-
-                    // 日期字段处理
-                    $date_fields = ['fee_reduction_start', 'fee_reduction_end'];
-                    if (in_array($field, $date_fields) && $value === '') {
-                        $value = null;
-                    }
-
-                    // 布尔字段处理
-                    $bool_fields = ['is_first_contact', 'is_receipt_title', 'is_fee_reduction', 'is_fee_monitor'];
-                    if (in_array($field, $bool_fields)) {
-                        $value = intval($value) ? 1 : 0;
-                    }
-
-                    $data[$field] = $value;
-                }
-            }
-
-            if ($id > 0) {
-                // 更新
-                $set = [];
-                foreach ($data as $key => $value) {
-                    if ($key !== 'patent_case_info_id') {
-                        $set[] = "$key = :$key";
-                    }
-                }
-                $data['id'] = $id;
-                $sql = "UPDATE patent_case_applicant SET " . implode(',', $set) . " WHERE id = :id AND patent_case_info_id = :patent_case_info_id";
-            } else {
-                // 新增
-                $keys = array_keys($data);
-                $placeholders = ':' . implode(', :', $keys);
-                $sql = "INSERT INTO patent_case_applicant (" . implode(',', $keys) . ") VALUES ($placeholders)";
-            }
-
-            $stmt = $pdo->prepare($sql);
-            $result = $stmt->execute($data);
-
-            if ($result) {
-                echo json_encode(['success' => true, 'msg' => '保存成功']);
-            } else {
-                echo json_encode(['success' => false, 'msg' => '保存失败']);
-            }
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'msg' => '保存失败：' . $e->getMessage()]);
-        }
-        exit;
-    }
-
-    if ($action === 'delete_applicant') {
-        try {
-            // 删除申请人
-            $id = intval($_POST['id'] ?? 0);
-            if ($id <= 0) {
-                echo json_encode(['success' => false, 'msg' => '无效的申请人ID']);
-                exit;
-            }
-
-            $stmt = $pdo->prepare("DELETE FROM patent_case_applicant WHERE id = ? AND patent_case_info_id = ?");
-            $result = $stmt->execute([$id, $patent_id]);
-
-            if ($result) {
-                echo json_encode(['success' => true, 'msg' => '删除成功']);
-            } else {
-                echo json_encode(['success' => false, 'msg' => '删除失败']);
-            }
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'msg' => '删除失败：' . $e->getMessage()]);
-        }
-        exit;
-    }
-
-    // 发明人相关操作
-    if ($action === 'get_inventor_list') {
-        try {
-            // 获取发明人列表
-            $sql = "SELECT * FROM patent_case_inventor WHERE patent_case_info_id = ? ORDER BY id ASC";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$patent_id]);
-            $rows = $stmt->fetchAll();
-
-            $html = '';
-            if (empty($rows)) {
-                $html = '<tr><td colspan="7" style="text-align:center;padding:20px 0;">暂无发明人数据</td></tr>';
-            } else {
-                foreach ($rows as $index => $i) {
-                    $area = htmlspecialchars(($i['province'] ?? '') . ($i['city_cn'] ? ' ' . $i['city_cn'] : ''));
-                    $html .= '<tr data-id="' . $i['id'] . '">' .
-                        '<td style="text-align:center;">' . ($index + 1) . '</td>' .
-                        '<td>' . htmlspecialchars($i['name_cn'] ?? '') . '</td>' .
-                        '<td>' . htmlspecialchars($i['name_en'] ?? '') . '</td>' .
-                        '<td>' . htmlspecialchars($i['nationality'] ?? '') . '</td>' .
-                        '<td>' . $area . '</td>' .
-                        '<td style="text-align:center;">' . ($i['is_tech_contact'] ? '是' : '否') . '</td>' .
-                        '<td style="text-align:center;">' .
-                        '<button type="button" class="btn-mini btn-edit">✎</button>' .
-                        '<button type="button" class="btn-mini btn-del" style="color:#f44336;">✖</button>' .
-                        '</td>' .
-                        '</tr>';
-                }
-            }
-
-            echo json_encode([
-                'success' => true,
-                'html' => $html
-            ]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'msg' => '获取数据失败：' . $e->getMessage()]);
-        }
-        exit;
-    }
-
-    if ($action === 'get_inventor') {
-        try {
-            // 获取单个发明人信息
-            $id = intval($_POST['id'] ?? 0);
-            if ($id <= 0) {
-                echo json_encode(['success' => false, 'msg' => '无效的发明人ID']);
-                exit;
-            }
-
-            $stmt = $pdo->prepare("SELECT * FROM patent_case_inventor WHERE id = ? AND patent_case_info_id = ?");
-            $stmt->execute([$id, $patent_id]);
-            $data = $stmt->fetch();
-
-            if (!$data) {
-                echo json_encode(['success' => false, 'msg' => '未找到发明人信息']);
-                exit;
-            }
-
-            echo json_encode(['success' => true, 'data' => $data]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'msg' => '获取数据失败：' . $e->getMessage()]);
-        }
-        exit;
-    }
-
-    if ($action === 'save_inventor') {
-        try {
-            // 保存发明人信息
-            $id = intval($_POST['id'] ?? 0);
-
-            // 字段列表
-            $fields = [
-                'name_cn',
-                'name_en',
-                'job_no',
-                'xing_cn',
-                'xing_en',
-                'ming_cn',
-                'ming_en',
-                'nationality',
-                'country',
-                'is_tech_contact',
-                'province',
-                'city_cn',
-                'city_en',
-                'address_cn',
-                'address_en',
-                'department_cn',
-                'department_en',
-                'email',
-                'id_number',
-                'phone',
-                'qq',
-                'mobile',
-                'postcode',
-                'remark'
-            ];
-
-            $data = ['patent_case_info_id' => $patent_id];
-
-            foreach ($fields as $field) {
-                if (isset($_POST[$field])) {
-                    $value = $_POST[$field];
-
-                    // 布尔字段处理
-                    if ($field === 'is_tech_contact') {
-                        $value = intval($value) ? 1 : 0;
-                    }
-
-                    $data[$field] = $value;
-                }
-            }
-
-            if ($id > 0) {
-                // 更新
-                $set = [];
-                foreach ($data as $key => $value) {
-                    if ($key !== 'patent_case_info_id') {
-                        $set[] = "$key = :$key";
-                    }
-                }
-                $data['id'] = $id;
-                $sql = "UPDATE patent_case_inventor SET " . implode(',', $set) . " WHERE id = :id AND patent_case_info_id = :patent_case_info_id";
-            } else {
-                // 新增
-                $keys = array_keys($data);
-                $placeholders = ':' . implode(', :', $keys);
-                $sql = "INSERT INTO patent_case_inventor (" . implode(',', $keys) . ") VALUES ($placeholders)";
-            }
-
-            $stmt = $pdo->prepare($sql);
-            $result = $stmt->execute($data);
-
-            if ($result) {
-                echo json_encode(['success' => true, 'msg' => '保存成功']);
-            } else {
-                echo json_encode(['success' => false, 'msg' => '保存失败']);
-            }
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'msg' => '保存失败：' . $e->getMessage()]);
-        }
-        exit;
-    }
-
-    if ($action === 'delete_inventor') {
-        try {
-            // 删除发明人
-            $id = intval($_POST['id'] ?? 0);
-            if ($id <= 0) {
-                echo json_encode(['success' => false, 'msg' => '无效的发明人ID']);
-                exit;
-            }
-
-            $stmt = $pdo->prepare("DELETE FROM patent_case_inventor WHERE id = ? AND patent_case_info_id = ?");
-            $result = $stmt->execute([$id, $patent_id]);
-
-            if ($result) {
-                echo json_encode(['success' => true, 'msg' => '删除成功']);
-            } else {
-                echo json_encode(['success' => false, 'msg' => '删除失败']);
-            }
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'msg' => '删除失败：' . $e->getMessage()]);
-        }
-        exit;
-    }
-
-    echo json_encode(['success' => false, 'msg' => '未知操作']);
-    exit;
-}
 
 function h($v)
 {
@@ -406,39 +36,39 @@ function h($v)
 
     <table class="module-table">
         <thead>
-            <tr style="background:#f2f2f2;">
-                <th style="width:40px;text-align:center;">序号</th>
-                <th style="width:120px;">申请人(中文)</th>
-                <th style="width:100px;">申请人类型</th>
-                <th style="width:80px;">实体类型</th>
-                <th style="width:120px;">所属地区</th>
-                <th style="width:100px;">联系电话</th>
-                <th style="width:80px;">第一联系人</th>
-                <th style="width:90px;">操作</th>
+            <tr class="module-table-header">
+                <th class="col-40 text-center">序号</th>
+                <th class="col-120">申请人(中文)</th>
+                <th class="col-100">申请人类型</th>
+                <th class="col-80">实体类型</th>
+                <th class="col-120">所属地区</th>
+                <th class="col-100">联系电话</th>
+                <th class="col-80">第一联系人</th>
+                <th class="col-90">操作</th>
             </tr>
         </thead>
         <tbody id="applicant-list">
             <tr>
-                <td colspan="8" style="text-align:center;padding:20px 0;">正在加载数据...</td>
+                <td colspan="8" class="text-center module-loading">正在加载数据...</td>
             </tr>
         </tbody>
     </table>
 </div>
 
 <!-- 申请人编辑弹窗 -->
-<div id="edit-applicant-modal" style="display:none;position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:9999;align-items:center;justify-content:center;">
-    <div style="background:#fff;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,0.18);padding:24px 32px;width:950px;max-width:98vw;max-height:80vh;position:relative;display:flex;flex-direction:column;">
-        <div style="position:absolute;right:18px;top:10px;cursor:pointer;font-size:22px;color:#888;" id="edit-applicant-modal-close">×</div>
-        <h3 style="text-align:center;margin-bottom:18px;" id="modal-title">编辑申请人</h3>
-        <div style="flex:1 1 auto;overflow-y:auto;">
+<div id="edit-applicant-modal" class="module-modal">
+    <div class="module-modal-content">
+        <div class="module-modal-close" id="edit-applicant-modal-close">×</div>
+        <h3 class="module-modal-title" id="modal-title">编辑申请人</h3>
+        <div class="module-modal-body">
             <form id="edit-applicant-form" class="module-form">
                 <input type="hidden" name="id" value="0">
-                <table class="module-table" style="table-layout:fixed;width:100%;min-width:0;">
+                <table class="module-table module-table-fixed">
                     <colgroup>
-                        <col style="width:120px;">
-                        <col style="width:320px;">
-                        <col style="width:120px;">
-                        <col style="width:320px;">
+                        <col class="col-120">
+                        <col class="col-320">
+                        <col class="col-120">
+                        <col class="col-320">
                     </colgroup>
                     <tr>
                         <td class="module-label module-req">*名称(中文)</td>
@@ -471,9 +101,9 @@ function h($v)
                     <tr>
                         <td class="module-label">案件类型</td>
                         <td>
-                            <label style="margin-right:18px;"><input type="checkbox" name="case_type_patent" value="专利"> 专利</label>
-                            <label style="margin-right:18px;"><input type="checkbox" name="case_type_trademark" value="商标"> 商标</label>
-                            <label style="margin-right:18px;"><input type="checkbox" name="case_type_copyright" value="版权"> 版权</label>
+                            <label class="module-checkbox-label"><input type="checkbox" name="case_type_patent" value="专利"> 专利</label>
+                            <label class="module-checkbox-label"><input type="checkbox" name="case_type_trademark" value="商标"> 商标</label>
+                            <label class="module-checkbox-label"><input type="checkbox" name="case_type_copyright" value="版权"> 版权</label>
                             <input type="hidden" name="case_type" value="">
                         </td>
                         <td class="module-label">名称/姓(中文)</td>
@@ -538,9 +168,9 @@ function h($v)
                             </select>
                         </td>
                         <td class="module-label">费用减案有效期</td>
-                        <td>
-                            <input type="date" name="fee_reduction_start" class="module-input" style="width:48%;display:inline-block;"> -
-                            <input type="date" name="fee_reduction_end" class="module-input" style="width:48%;display:inline-block;">
+                        <td class="module-date-range">
+                            <input type="date" name="fee_reduction_start" class="module-input"> -
+                            <input type="date" name="fee_reduction_end" class="module-input">
                         </td>
                     </tr>
                     <tr>
@@ -582,7 +212,7 @@ function h($v)
                         <td class="module-label">联系人</td>
                         <td><input type="text" name="contact_person" class="module-input"></td>
                     </tr>
-                    <tr id="receipt_title_row" style="display:none;">
+                    <tr id="receipt_title_row" class="hidden">
                         <td class="module-label">申请人收据抬头</td>
                         <td><input type="text" name="receipt_title" class="module-input"></td>
                         <td class="module-label">申请人统一社会信用代码</td>
@@ -590,37 +220,37 @@ function h($v)
                     </tr>
                     <tr>
                         <td class="module-label">备注</td>
-                        <td colspan="3"><textarea name="remark" class="module-input" style="min-height:48px;width:100%;"></textarea></td>
+                        <td colspan="3"><textarea name="remark" class="module-textarea"></textarea></td>
                     </tr>
                     <tr>
                         <td class="module-label">上传文件</td>
                         <td colspan="3">
-                            <div style="margin-bottom:8px;">
+                            <div class="module-file-upload">
                                 <label>费减证明：</label>
-                                <input type="text" id="file-name-fee-reduction" placeholder="文件命名（可选）" style="width:120px;">
-                                <input type="file" id="file-feijian" style="display:inline-block;width:auto;">
+                                <input type="text" id="file-name-fee-reduction" placeholder="文件命名（可选）">
+                                <input type="file" id="file-feijian">
                                 <button type="button" class="btn-mini" id="btn-upload-feijian">上传</button>
-                                <div id="feijian-file-list" style="margin-top:4px;"></div>
+                                <div id="feijian-file-list" class="module-file-list"></div>
                             </div>
-                            <div style="margin-bottom:8px;">
+                            <div class="module-file-upload">
                                 <label>总委托书：</label>
-                                <input type="text" id="file-name-power" placeholder="文件命名（可选）" style="width:120px;">
-                                <input type="file" id="file-weituoshu" style="display:inline-block;width:auto;">
+                                <input type="text" id="file-name-power" placeholder="文件命名（可选）">
+                                <input type="file" id="file-weituoshu">
                                 <button type="button" class="btn-mini" id="btn-upload-weituoshu">上传</button>
-                                <div id="weituoshu-file-list" style="margin-top:4px;"></div>
+                                <div id="weituoshu-file-list" class="module-file-list"></div>
                             </div>
-                            <div>
+                            <div class="module-file-upload">
                                 <label>附件：</label>
-                                <input type="text" id="file-name-attach" placeholder="文件命名（可选，所有文件同名）" style="width:120px;">
-                                <input type="file" id="file-fujian" multiple style="display:inline-block;width:auto;">
+                                <input type="text" id="file-name-attach" placeholder="文件命名（可选，所有文件同名）">
+                                <input type="file" id="file-fujian" multiple>
                                 <button type="button" class="btn-mini" id="btn-upload-fujian">上传</button>
-                                <div id="fujian-file-list" style="margin-top:4px;"></div>
+                                <div id="fujian-file-list" class="module-file-list"></div>
                             </div>
                         </td>
                     </tr>
                 </table>
-                <div style="text-align:center;margin-top:12px;">
-                    <button type="button" class="btn-save-edit-applicant btn-mini" style="margin-right:16px;">保存</button>
+                <div class="module-form-buttons">
+                    <button type="button" class="btn-save-edit-applicant btn-mini">保存</button>
                     <button type="button" class="btn-cancel-edit-applicant btn-mini">取消</button>
                 </div>
             </form>
@@ -629,45 +259,46 @@ function h($v)
 </div>
 
 <!-- 发明人管理区域 -->
-<div class="module-panel" style="margin-top:20px;">
+<div class="module-panel mt-20">
     <div class="module-btns">
+
         <button type="button" class="btn-add-inventor"><i class="icon-add"></i> 新增发明人</button>
     </div>
 
     <table class="module-table">
         <thead>
-            <tr style="background:#f2f2f2;">
-                <th style="width:40px;text-align:center;">序号</th>
-                <th style="width:120px;">中文名</th>
-                <th style="width:120px;">英文名</th>
-                <th style="width:80px;">国籍</th>
-                <th style="width:120px;">所属地区</th>
-                <th style="width:80px;">技术联系人</th>
-                <th style="width:90px;">操作</th>
+            <tr class="module-table-header">
+                <th class="col-40 text-center">序号</th>
+                <th class="col-120">中文名</th>
+                <th class="col-120">英文名</th>
+                <th class="col-80">国籍</th>
+                <th class="col-120">所属地区</th>
+                <th class="col-80">技术联系人</th>
+                <th class="col-90">操作</th>
             </tr>
         </thead>
         <tbody id="inventor-list">
             <tr>
-                <td colspan="7" style="text-align:center;padding:20px 0;">正在加载数据...</td>
+                <td colspan="7" class="text-center module-loading">正在加载数据...</td>
             </tr>
         </tbody>
     </table>
 </div>
 
 <!-- 发明人编辑弹窗 -->
-<div id="edit-inventor-modal" style="display:none;position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:9999;align-items:center;justify-content:center;">
-    <div style="background:#fff;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,0.18);padding:24px 32px;width:950px;max-width:98vw;max-height:80vh;position:relative;display:flex;flex-direction:column;">
-        <div style="position:absolute;right:18px;top:10px;cursor:pointer;font-size:22px;color:#888;" id="edit-inventor-modal-close">×</div>
-        <h3 style="text-align:center;margin-bottom:18px;" id="inventor-modal-title">编辑发明人</h3>
-        <div style="flex:1 1 auto;overflow-y:auto;">
+<div id="edit-inventor-modal" class="module-modal">
+    <div class="module-modal-content">
+        <div class="module-modal-close" id="edit-inventor-modal-close">×</div>
+        <h3 class="module-modal-title" id="inventor-modal-title">编辑发明人</h3>
+        <div class="module-modal-body">
             <form id="edit-inventor-form" class="module-form">
                 <input type="hidden" name="id" value="0">
-                <table class="module-table" style="table-layout:fixed;width:100%;min-width:0;">
+                <table class="module-table module-table-fixed">
                     <colgroup>
-                        <col style="width:120px;">
-                        <col style="width:320px;">
-                        <col style="width:120px;">
-                        <col style="width:320px;">
+                        <col class="col-120">
+                        <col class="col-320">
+                        <col class="col-120">
+                        <col class="col-320">
                     </colgroup>
                     <tr>
                         <td class="module-label module-req">*中文名</td>
@@ -744,11 +375,11 @@ function h($v)
                         <td class="module-label">邮编</td>
                         <td><input type="text" name="postcode" class="module-input"></td>
                         <td class="module-label">备注</td>
-                        <td><textarea name="remark" class="module-input" style="min-height:48px;"></textarea></td>
+                        <td><textarea name="remark" class="module-textarea"></textarea></td>
                     </tr>
                 </table>
-                <div style="text-align:center;margin-top:12px;">
-                    <button type="button" class="btn-save-edit-inventor btn-mini" style="margin-right:16px;">保存</button>
+                <div class="module-form-buttons">
+                    <button type="button" class="btn-save-edit-inventor btn-mini">保存</button>
                     <button type="button" class="btn-cancel-edit-inventor btn-mini">取消</button>
                 </div>
             </form>
@@ -756,623 +387,911 @@ function h($v)
     </div>
 </div>
 
+<!-- 代理机构管理区域 -->
+<div class="module-panel">
+    <div class="module-btns">
+        <button type="button" class="btn-select-agency" id="btn-select-agency"><i class="icon-add"></i> 选择代理机构</button>
+    </div>
+
+    <!-- 代理机构信息显示区域 -->
+    <div id="agency-info-area" class="hidden">
+        <table class="module-table">
+            <thead>
+                <tr class="module-table-header">
+                    <th class="col-150">代理机构名称</th>
+                    <th class="col-100">代理机构代码</th>
+                    <th class="col-200">备注</th>
+                    <th class="col-80">操作</th>
+                </tr>
+            </thead>
+            <tbody id="agency-basic-info">
+                <!-- 代理机构基本信息 -->
+            </tbody>
+        </table>
+
+        <!-- 代理人信息 -->
+        <div class="module-agency-section">
+            <h4 class="module-agency-title">
+                <span class="theme-color">👤</span> 代理人及联系人列表
+                <button type="button" class="btn-edit-agency-details module-agency-button">选择代理人及联系人</button>
+            </h4>
+            <!-- 把代理人和联系人列表分开成两行 -->
+            <div class="module-agency-flex">
+                <!-- 代理人列表 -->
+                <div class="module-agency-flex-item">
+                    <h5 class="module-agency-subtitle">代理人</h5>
+                    <table class="module-table">
+                        <thead>
+                            <tr class="module-table-header-light">
+                                <th class="col-80">序号</th>
+                                <th class="col-100">姓名</th>
+                                <th class="col-100">执业证号</th>
+                                <th class="col-80">电话</th>
+                            </tr>
+                        </thead>
+                        <tbody id="agency-agents-list">
+                            <tr>
+                                <td colspan="4" class="text-center module-loading-small">请先选择代理人</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- 联系人列表 -->
+            <div class="module-agency-flex">
+                <div class="module-agency-flex-item">
+                    <h5 class="module-agency-subtitle">联系人</h5>
+                    <table class="module-table">
+                        <thead>
+                            <tr class="module-table-header-light">
+                                <th class="col-80">序号</th>
+                                <th class="col-100">姓名</th>
+                                <th class="col-100">手机</th>
+                                <th class="col-120">邮箱</th>
+                            </tr>
+                        </thead>
+                        <tbody id="agency-contacts-list">
+                            <tr>
+                                <td colspan="4" class="text-center module-loading-small">请先选择联系人</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 代理机构选择/编辑弹窗 -->
+<div id="agency-modal" class="module-modal">
+    <div class="module-modal-content">
+        <div class="module-modal-close btn-close-agency-modal">&times;</div>
+        <h3 id="agency-modal-title" class="module-modal-title">选择代理机构</h3>
+        <div class="module-modal-body">
+            <form id="agency-form" class="module-form">
+                <input type="hidden" name="id" value="0">
+
+                <table class="module-table mb-20">
+                    <tr>
+                        <td class="module-label module-req">代理机构</td>
+                        <td>
+                            <select name="agency_id" class="module-input" required>
+                                <option value="">--请选择代理机构--</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="module-label">备注</td>
+                        <td>
+                            <textarea name="remark" class="module-textarea" placeholder="请输入备注信息" rows="3"></textarea>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- 代理人选择区域 -->
+                <div class="mb-20">
+                    <h4 class="module-agency-title">选择代理人</h4>
+                    <div id="agent-selection" class="module-agency-selection">
+                        <span class="module-loading-small">请先选择代理机构</span>
+                    </div>
+                </div>
+
+                <!-- 联系人选择区域 -->
+                <div class="mb-20">
+                    <h4 class="module-agency-title">选择联系人</h4>
+                    <div id="contact-selection" class="module-agency-selection">
+                        <span class="module-loading-small">请先选择代理机构</span>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="module-form-buttons">
+            <button type="button" class="btn-save-agency btn-mini">保存</button>
+            <button type="button" class="btn-cancel-agency btn-mini">取消</button>
+        </div>
+    </div>
+</div>
+
 <script>
     (function() {
         var patentId = <?= $patent_id ?>;
-        var btnAddApplicant = document.querySelector('.btn-add-applicant'),
-            applicantList = document.getElementById('applicant-list');
+        var API_URL = 'modules/patent_management/edit_tabs/applicant_api.php?patent_id=' + patentId;
+        var FILE_API_URL = 'modules/patent_management/edit_tabs/applicant_file_upload.php?patent_id=' + patentId;
 
-        // 将deleteFile函数移到全局作用域
-        window.deleteFile = function(fileId, fileType, applicantId, listDivId) {
-            if (!confirm('确定要删除这个文件吗？')) {
-                return;
+        // 通用AJAX请求函数
+        function makeRequest(action, data, callback, errorMsg) {
+            var formData = new FormData();
+            formData.append('action', action);
+
+            if (data) {
+                Object.keys(data).forEach(function(key) {
+                    formData.append(key, data[key]);
+                });
             }
 
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', 'modules/patent_management/edit_tabs/applicant_file_upload.php?patent_id=' + patentId, true);
-            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', API_URL, true);
             xhr.onload = function() {
                 try {
-                    const response = JSON.parse(xhr.responseText);
-                    if (response.success) {
-                        alert('文件删除成功');
-                        renderFileList(applicantId, fileType, listDivId);
-                    } else {
-                        alert('删除失败：' + (response.message || '未知错误'));
-                    }
+                    var response = JSON.parse(xhr.responseText);
+                    callback(response);
                 } catch (e) {
-                    console.error('删除响应解析错误:', e);
-                    alert('删除失败：响应解析错误');
-                }
-            };
-            xhr.send('action=delete&file_id=' + fileId);
-        };
-
-        function loadApplicantData() {
-            applicantList.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px 0;">正在加载数据...</td></tr>';
-
-            var formData = new FormData();
-            formData.append('action', 'get_applicant_list');
-
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', 'modules/patent_management/edit_tabs/applicant.php?patent_id=' + patentId, true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        try {
-                            var response = JSON.parse(xhr.responseText);
-                            if (response.success) {
-                                applicantList.innerHTML = response.html;
-                                bindTableRowClick();
-                            } else {
-                                applicantList.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px 0;">加载数据失败：' + (response.msg || '') + '</td></tr>';
-                            }
-                        } catch (e) {
-                            applicantList.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px 0;">加载数据失败：解析响应错误</td></tr>';
-                        }
-                    } else {
-                        applicantList.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px 0;">加载数据失败，请稍后重试</td></tr>';
-                    }
+                    alert((errorMsg || '操作失败') + '：响应解析错误');
                 }
             };
             xhr.send(formData);
         }
 
-        function bindTableRowClick() {
-            applicantList.querySelectorAll('tr[data-id]').forEach(function(row) {
-                row.querySelector('.btn-del').onclick = function() {
-                    if (!confirm('确定删除该申请人？')) return;
-                    var id = row.getAttribute('data-id');
-                    var formData = new FormData();
-                    formData.append('action', 'delete_applicant');
-                    formData.append('id', id);
-                    var xhr = new XMLHttpRequest();
-                    xhr.open('POST', 'modules/patent_management/edit_tabs/applicant.php?patent_id=' + patentId, true);
-                    xhr.onload = function() {
-                        try {
-                            var res = JSON.parse(xhr.responseText);
-                            if (res.success) {
-                                loadApplicantData();
-                            } else {
-                                alert('删除失败：' + (res.msg || ''));
-                            }
-                        } catch (e) {
-                            alert('删除失败：响应解析错误');
-                        }
-                    };
-                    xhr.send(formData);
-                };
-
-                row.querySelector('.btn-edit').onclick = function() {
-                    var id = row.getAttribute('data-id');
-                    openApplicantModal(id);
-                };
-            });
+        // 通用模态框操作
+        function toggleModal(modalId, show) {
+            document.getElementById(modalId).style.display = show ? 'flex' : 'none';
         }
 
-        function openApplicantModal(id) {
-            var modal = document.getElementById('edit-applicant-modal');
-            var form = document.getElementById('edit-applicant-form');
-            var modalTitle = document.getElementById('modal-title');
-
-            form.reset();
-
-            // 清空文件列表
-            clearFileList();
-
-            if (id && id !== '0') {
-                // 编辑模式
-                modalTitle.textContent = '编辑申请人';
-                var formData = new FormData();
-                formData.append('action', 'get_applicant');
-                formData.append('id', id);
-
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', 'modules/patent_management/edit_tabs/applicant.php?patent_id=' + patentId, true);
-                xhr.onload = function() {
-                    try {
-                        var res = JSON.parse(xhr.responseText);
-                        if (res.success && res.data) {
-                            for (var k in res.data) {
-                                if (form[k] !== undefined && form[k].type !== 'checkbox') {
-                                    form[k].value = res.data[k] !== null ? res.data[k] : '';
-                                }
-                            }
-
-                            // 多选案件类型
-                            if (res.data.case_type) {
-                                var arr = res.data.case_type.split(',');
-                                form.querySelectorAll('input[type=checkbox][name^=case_type_]').forEach(function(cb) {
-                                    cb.checked = arr.indexOf(cb.value) !== -1;
-                                });
-                            } else {
-                                form.querySelectorAll('input[type=checkbox][name^=case_type_]').forEach(function(cb) {
-                                    cb.checked = false;
-                                });
-                            }
-
-                            form.is_first_contact.checked = res.data.is_first_contact == 1;
-                            form.is_receipt_title.checked = res.data.is_receipt_title == 1;
-                            document.getElementById('receipt_title_row').style.display = form.is_receipt_title.checked ? '' : 'none';
-
-                            modal.style.display = 'flex';
-
-                            // 绑定文件上传功能并加载文件列表
-                            bindFileUpload(id, true);
-                        } else {
-                            alert('获取数据失败：' + (res.msg || ''));
-                        }
-                    } catch (e) {
-                        alert('获取数据失败：响应解析错误');
-                    }
-                };
-                xhr.send(formData);
-            } else {
-                // 新增模式
-                modalTitle.textContent = '新增申请人';
-                form.id.value = '0';
-                modal.style.display = 'flex';
-
-                // 绑定文件上传功能但不加载文件列表
-                bindFileUpload(0, false);
+        // 通用确认删除
+        function confirmDelete(message, callback) {
+            if (confirm(message)) {
+                callback();
             }
         }
 
-        // 清空文件列表
-        function clearFileList() {
-            document.getElementById('feijian-file-list').innerHTML = '';
-            document.getElementById('weituoshu-file-list').innerHTML = '';
-            document.getElementById('fujian-file-list').innerHTML = '';
+        // 通用文件上传函数
+        function uploadFile(fileType, fileInputId, fileNameInputId, listDivId, applicantId) {
+            if (applicantId === 0) {
+                alert('请先保存申请人信息后再上传文件');
+                return;
+            }
 
-            // 清空文件命名输入框
-            document.getElementById('file-name-fee-reduction').value = '';
-            document.getElementById('file-name-power').value = '';
-            document.getElementById('file-name-attach').value = '';
+            var fileInput = document.getElementById(fileInputId);
+            var fileNameInput = document.getElementById(fileNameInputId);
 
-            // 清空文件选择框
-            document.getElementById('file-feijian').value = '';
-            document.getElementById('file-weituoshu').value = '';
-            document.getElementById('file-fujian').value = '';
+            if (!fileInput.files.length) {
+                alert('请选择文件');
+                return;
+            }
+
+            var files = Array.from(fileInput.files);
+            var uploadCount = 0;
+            var successCount = 0;
+            var errorMessages = [];
+
+            files.forEach(function(file, index) {
+                var formData = new FormData();
+                formData.append('action', 'upload');
+                formData.append('patent_case_applicant_id', applicantId);
+                formData.append('file_type', fileType);
+                formData.append('file', file);
+
+                if (fileNameInput.value.trim()) {
+                    var customName = fileNameInput.value.trim();
+                    if (files.length > 1) {
+                        var ext = file.name.split('.').pop();
+                        customName = customName + '_' + (index + 1) + '.' + ext;
+                    } else if (!customName.includes('.')) {
+                        var ext = file.name.split('.').pop();
+                        customName = customName + '.' + ext;
+                    }
+                    formData.append('custom_filename', customName);
+                }
+
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', FILE_API_URL, true);
+                xhr.onload = function() {
+                    uploadCount++;
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        if (response.success) {
+                            successCount++;
+                        } else {
+                            errorMessages.push('文件 ' + file.name + ' 上传失败：' + (response.message || '未知错误'));
+                        }
+                    } catch (e) {
+                        errorMessages.push('文件 ' + file.name + ' 上传失败：响应解析错误');
+                    }
+
+                    if (uploadCount === files.length) {
+                        if (successCount === files.length) {
+                            alert('上传成功');
+                        } else if (successCount > 0) {
+                            alert('部分文件上传成功 (' + successCount + '/' + files.length + ')：\n' + errorMessages.join('\n'));
+                        } else {
+                            alert('上传失败：\n' + errorMessages.join('\n'));
+                        }
+                        fileInput.value = '';
+                        fileNameInput.value = '';
+                        renderFileList(applicantId, fileType, listDivId);
+                    }
+                };
+                xhr.send(formData);
+            });
         }
 
         // 渲染文件列表
         function renderFileList(applicantId, fileType, listDivId) {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', 'modules/patent_management/edit_tabs/applicant_file_upload.php?patent_id=' + patentId, true);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', FILE_API_URL, true);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
             xhr.onload = function() {
                 try {
-                    const response = JSON.parse(xhr.responseText);
-                    if (response.success) {
-                        let html = '<table style="width:100%; border-collapse:collapse; margin-top:10px;">';
-                        html += '<tr style="background:#f5f5f5;"><th style="border:1px solid #ddd; padding:5px;">文件名</th><th style="border:1px solid #ddd; padding:5px;">大小</th><th style="border:1px solid #ddd; padding:5px;">上传时间</th><th style="border:1px solid #ddd; padding:5px;">操作</th></tr>';
+                    var response = JSON.parse(xhr.responseText);
+                    var html = '<table style="width:100%; border-collapse:collapse; margin-top:10px;">';
+                    html += '<tr style="background:#f5f5f5;"><th style="border:1px solid #ddd; padding:5px;">文件名</th><th style="border:1px solid #ddd; padding:5px;">大小</th><th style="border:1px solid #ddd; padding:5px;">上传时间</th><th style="border:1px solid #ddd; padding:5px;">操作</th></tr>';
 
-                        if (response.files && response.files.length > 0) {
-                            response.files.forEach(function(file) {
-                                const fileSize = file.file_size ? (file.file_size / 1024).toFixed(1) + ' KB' : '未知';
-                                const uploadTime = file.created_at ? file.created_at.substring(0, 16) : '';
-                                html += '<tr>';
-                                html += '<td style="border:1px solid #ddd; padding:5px;">' + (file.file_name || '') + '</td>';
-                                html += '<td style="border:1px solid #ddd; padding:5px;">' + fileSize + '</td>';
-                                html += '<td style="border:1px solid #ddd; padding:5px;">' + uploadTime + '</td>';
-                                html += '<td style="border:1px solid #ddd; padding:5px;">';
-                                html += '<a href="' + file.file_path + '" target="_blank" download="' + (file.file_name || '') + '" style="margin-right:10px;" class="btn-mini">下载</a>';
-                                html += '<a href="javascript:void(0)" onclick="deleteFile(' + file.id + ', \'' + fileType + '\', ' + applicantId + ', \'' + listDivId + '\')" style="color:red;" class="btn-mini">删除</a>';
-                                html += '</td>';
-                                html += '</tr>';
-                            });
-                        } else {
-                            html += '<tr><td colspan="4" style="border:1px solid #ddd; padding:10px; text-align:center; color:#999;">暂无文件</td></tr>';
-                        }
-                        html += '</table>';
-                        document.getElementById(listDivId).innerHTML = html;
+                    if (response.success && response.files && response.files.length > 0) {
+                        response.files.forEach(function(file) {
+                            var fileSize = file.file_size ? (file.file_size / 1024).toFixed(1) + ' KB' : '未知';
+                            var uploadTime = file.created_at ? file.created_at.substring(0, 16) : '';
+                            html += '<tr>';
+                            html += '<td style="border:1px solid #ddd; padding:5px;">' + (file.file_name || '') + '</td>';
+                            html += '<td style="border:1px solid #ddd; padding:5px;">' + fileSize + '</td>';
+                            html += '<td style="border:1px solid #ddd; padding:5px;">' + uploadTime + '</td>';
+                            html += '<td style="border:1px solid #ddd; padding:5px;">';
+                            html += '<a href="' + file.file_path + '" target="_blank" download="' + (file.file_name || '') + '" style="margin-right:10px;" class="btn-mini">下载</a>';
+                            html += '<a href="javascript:void(0)" onclick="deleteFile(' + file.id + ', \'' + fileType + '\', ' + applicantId + ', \'' + listDivId + '\')" style="color:red;" class="btn-mini">删除</a>';
+                            html += '</td></tr>';
+                        });
                     } else {
-                        console.error('文件列表加载失败:', response.message || '未知错误');
-                        document.getElementById(listDivId).innerHTML = '<div style="color:red; padding:10px;">文件列表加载失败</div>';
+                        html += '<tr><td colspan="4" style="border:1px solid #ddd; padding:10px; text-align:center; color:#999;">暂无文件</td></tr>';
                     }
+                    html += '</table>';
+                    document.getElementById(listDivId).innerHTML = html;
                 } catch (e) {
-                    console.error('文件列表解析错误:', e, '响应内容:', xhr.responseText);
                     document.getElementById(listDivId).innerHTML = '<div style="color:red; padding:10px;">文件列表解析错误</div>';
                 }
             };
             xhr.send('action=list&patent_case_applicant_id=' + applicantId + '&file_type=' + encodeURIComponent(fileType));
         }
 
-        // 绑定文件上传功能
-        function bindFileUpload(applicantId, loadFileList) {
-            // 费减证明上传
-            document.getElementById('btn-upload-feijian').onclick = function() {
-                if (applicantId === 0) {
-                    alert('请先保存申请人信息后再上传文件');
-                    return;
-                }
-
-                const fileInput = document.getElementById('file-feijian');
-                const fileNameInput = document.getElementById('file-name-fee-reduction');
-                if (!fileInput.files.length) {
-                    alert('请选择文件');
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('action', 'upload');
-                formData.append('patent_case_applicant_id', applicantId);
-                formData.append('file_type', '费减证明');
-                formData.append('file', fileInput.files[0]);
-
-                // 如果用户输入了自定义文件名，则使用自定义文件名
-                if (fileNameInput.value.trim()) {
-                    formData.append('custom_filename', fileNameInput.value.trim());
-                }
-
-                const xhr = new XMLHttpRequest();
-                xhr.open('POST', 'modules/patent_management/edit_tabs/applicant_file_upload.php?patent_id=' + patentId, true);
+        // 全局删除文件函数
+        window.deleteFile = function(fileId, fileType, applicantId, listDivId) {
+            confirmDelete('确定要删除这个文件吗？', function() {
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', FILE_API_URL, true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
                 xhr.onload = function() {
                     try {
-                        const response = JSON.parse(xhr.responseText);
+                        var response = JSON.parse(xhr.responseText);
                         if (response.success) {
-                            alert('上传成功');
-                            fileInput.value = '';
-                            fileNameInput.value = ''; // 清空文件命名输入框
-                            renderFileList(applicantId, '费减证明', 'feijian-file-list');
+                            alert('文件删除成功');
+                            renderFileList(applicantId, fileType, listDivId);
                         } else {
-                            alert('上传失败：' + (response.message || '未知错误'));
+                            alert('删除失败：' + (response.message || '未知错误'));
                         }
                     } catch (e) {
-                        console.error('上传响应解析错误:', e);
-                        alert('上传失败：响应解析错误');
+                        alert('删除失败：响应解析错误');
                     }
                 };
-                xhr.send(formData);
-            };
+                xhr.send('action=delete&file_id=' + fileId);
+            });
+        };
 
-            // 总委托书上传
-            document.getElementById('btn-upload-weituoshu').onclick = function() {
-                if (applicantId === 0) {
-                    alert('请先保存申请人信息后再上传文件');
-                    return;
-                }
+        // 申请人管理模块
+        var ApplicantManager = {
+            elements: {
+                btnAdd: document.querySelector('.btn-add-applicant'),
+                list: document.getElementById('applicant-list'),
+                modal: document.getElementById('edit-applicant-modal'),
+                form: document.getElementById('edit-applicant-form'),
+                modalTitle: document.getElementById('modal-title')
+            },
 
-                const fileInput = document.getElementById('file-weituoshu');
-                const fileNameInput = document.getElementById('file-name-power');
-                if (!fileInput.files.length) {
-                    alert('请选择文件');
-                    return;
-                }
+            init: function() {
+                this.bindEvents();
+                this.loadData();
+            },
 
-                const formData = new FormData();
-                formData.append('action', 'upload');
-                formData.append('patent_case_applicant_id', applicantId);
-                formData.append('file_type', '总委托书');
-                formData.append('file', fileInput.files[0]);
-
-                // 如果用户输入了自定义文件名，则使用自定义文件名
-                if (fileNameInput.value.trim()) {
-                    formData.append('custom_filename', fileNameInput.value.trim());
-                }
-
-                const xhr = new XMLHttpRequest();
-                xhr.open('POST', 'modules/patent_management/edit_tabs/applicant_file_upload.php?patent_id=' + patentId, true);
-                xhr.onload = function() {
-                    try {
-                        const response = JSON.parse(xhr.responseText);
-                        if (response.success) {
-                            alert('上传成功');
-                            fileInput.value = '';
-                            fileNameInput.value = ''; // 清空文件命名输入框
-                            renderFileList(applicantId, '总委托书', 'weituoshu-file-list');
-                        } else {
-                            alert('上传失败：' + (response.message || '未知错误'));
-                        }
-                    } catch (e) {
-                        console.error('上传响应解析错误:', e);
-                        alert('上传失败：响应解析错误');
-                    }
+            bindEvents: function() {
+                var self = this;
+                this.elements.btnAdd.onclick = function() {
+                    self.openModal(0);
                 };
-                xhr.send(formData);
-            };
+                document.getElementById('edit-applicant-modal-close').onclick = function() {
+                    toggleModal('edit-applicant-modal', false);
+                };
+                document.querySelector('.btn-cancel-edit-applicant').onclick = function() {
+                    toggleModal('edit-applicant-modal', false);
+                };
+                document.querySelector('.btn-save-edit-applicant').onclick = function() {
+                    self.save();
+                };
 
-            // 附件上传
-            document.getElementById('btn-upload-fujian').onclick = function() {
-                if (applicantId === 0) {
-                    alert('请先保存申请人信息后再上传文件');
-                    return;
+                var receiptCb = document.getElementById('is_receipt_title_cb');
+                if (receiptCb) {
+                    receiptCb.addEventListener('change', function() {
+                        document.getElementById('receipt_title_row').style.display = receiptCb.checked ? '' : 'none';
+                    });
                 }
+            },
 
-                const fileInput = document.getElementById('file-fujian');
-                const fileNameInput = document.getElementById('file-name-attach');
-                if (!fileInput.files.length) {
-                    alert('请选择文件');
-                    return;
-                }
+            loadData: function() {
+                var self = this;
+                this.elements.list.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px 0;">正在加载数据...</td></tr>';
 
-                // 处理多文件上传
-                const files = Array.from(fileInput.files);
-                let uploadCount = 0;
-                let successCount = 0;
-                let errorMessages = [];
-
-                files.forEach(function(file, index) {
-                    const formData = new FormData();
-                    formData.append('action', 'upload');
-                    formData.append('patent_case_applicant_id', applicantId);
-                    formData.append('file_type', '附件');
-                    formData.append('file', file);
-
-                    // 如果用户输入了自定义文件名，则使用自定义文件名
-                    // 对于多文件，如果有自定义文件名，会在文件名后加上序号
-                    if (fileNameInput.value.trim()) {
-                        let customName = fileNameInput.value.trim();
-                        if (files.length > 1) {
-                            // 多文件时在文件名后加序号
-                            const ext = file.name.split('.').pop();
-                            customName = customName + '_' + (index + 1) + '.' + ext;
-                        } else {
-                            // 单文件时保持原扩展名
-                            const ext = file.name.split('.').pop();
-                            if (!customName.includes('.')) {
-                                customName = customName + '.' + ext;
-                            }
-                        }
-                        formData.append('custom_filename', customName);
+                makeRequest('get_applicant_list', null, function(response) {
+                    if (response.success) {
+                        self.elements.list.innerHTML = response.html;
+                        self.bindTableEvents();
+                    } else {
+                        self.elements.list.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px 0;">加载数据失败：' + (response.msg || '') + '</td></tr>';
                     }
+                }, '加载申请人数据失败');
+            },
 
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', 'modules/patent_management/edit_tabs/applicant_file_upload.php?patent_id=' + patentId, true);
-                    xhr.onload = function() {
-                        uploadCount++;
-                        try {
-                            const response = JSON.parse(xhr.responseText);
-                            if (response.success) {
-                                successCount++;
-                            } else {
-                                errorMessages.push('文件 ' + file.name + ' 上传失败：' + (response.message || '未知错误'));
-                            }
-                        } catch (e) {
-                            errorMessages.push('文件 ' + file.name + ' 上传失败：响应解析错误');
-                        }
-
-                        // 所有文件上传完成后显示结果
-                        if (uploadCount === files.length) {
-                            if (successCount === files.length) {
-                                alert('所有文件上传成功');
-                            } else if (successCount > 0) {
-                                alert('部分文件上传成功 (' + successCount + '/' + files.length + ')：\n' + errorMessages.join('\n'));
-                            } else {
-                                alert('所有文件上传失败：\n' + errorMessages.join('\n'));
-                            }
-
-                            fileInput.value = '';
-                            fileNameInput.value = ''; // 清空文件命名输入框
-                            renderFileList(applicantId, '附件', 'fujian-file-list');
-                        }
+            bindTableEvents: function() {
+                var self = this;
+                this.elements.list.querySelectorAll('tr[data-id]').forEach(function(row) {
+                    var id = row.getAttribute('data-id');
+                    row.querySelector('.btn-del').onclick = function() {
+                        confirmDelete('确定删除该申请人？', function() {
+                            makeRequest('delete_applicant', {
+                                id: id
+                            }, function(response) {
+                                if (response.success) {
+                                    self.loadData();
+                                } else {
+                                    alert('删除失败：' + (response.msg || ''));
+                                }
+                            }, '删除申请人失败');
+                        });
                     };
-                    xhr.send(formData);
+                    row.querySelector('.btn-edit').onclick = function() {
+                        self.openModal(id);
+                    };
                 });
-            };
+            },
 
-            // 如果是编辑模式且需要加载文件列表，则初始加载文件列表
-            if (loadFileList && applicantId > 0) {
-                renderFileList(applicantId, '费减证明', 'feijian-file-list');
-                renderFileList(applicantId, '总委托书', 'weituoshu-file-list');
-                renderFileList(applicantId, '附件', 'fujian-file-list');
-            }
-        }
+            openModal: function(id) {
+                var self = this;
+                this.elements.form.reset();
+                this.clearFileList();
 
-        // 事件绑定
-        btnAddApplicant.onclick = function() {
-            openApplicantModal(0);
-        };
-
-        // 弹窗关闭
-        document.getElementById('edit-applicant-modal-close').onclick = function() {
-            document.getElementById('edit-applicant-modal').style.display = 'none';
-        };
-
-        document.querySelector('.btn-cancel-edit-applicant').onclick = function() {
-            document.getElementById('edit-applicant-modal').style.display = 'none';
-        };
-
-        // 弹窗保存
-        document.querySelector('.btn-save-edit-applicant').onclick = function() {
-            var form = document.getElementById('edit-applicant-form');
-
-            // 多选案件类型
-            var checkedTypes = Array.from(form.querySelectorAll('input[type=checkbox][name^=case_type_]:checked')).map(function(cb) {
-                return cb.value;
-            });
-            form.case_type.value = checkedTypes.join(',');
-
-            form.is_first_contact.value = form.is_first_contact.checked ? 1 : 0;
-            form.is_receipt_title.value = form.is_receipt_title.checked ? 1 : 0;
-
-            if (!form.is_receipt_title.checked) {
-                form.receipt_title.value = '';
-                form.credit_code.value = '';
-            }
-
-            var formData = new FormData(form);
-            formData.append('action', 'save_applicant');
-
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', 'modules/patent_management/edit_tabs/applicant.php?patent_id=' + patentId, true);
-            xhr.onload = function() {
-                try {
-                    var res = JSON.parse(xhr.responseText);
-                    if (res.success) {
-                        document.getElementById('edit-applicant-modal').style.display = 'none';
-                        loadApplicantData();
-                    } else {
-                        alert('保存失败：' + (res.msg || ''));
-                    }
-                } catch (e) {
-                    alert('保存失败：响应解析错误');
-                }
-            };
-            xhr.send(formData);
-        };
-
-        // 控制"作为收据抬头"显示隐藏
-        var receiptCb = document.getElementById('is_receipt_title_cb');
-        if (receiptCb) {
-            receiptCb.addEventListener('change', function() {
-                document.getElementById('receipt_title_row').style.display = receiptCb.checked ? '' : 'none';
-            });
-        }
-
-        // 初始加载数据
-        loadApplicantData();
-    })();
-
-    // 发明人管理功能
-    (function() {
-        var patentId = <?= $patent_id ?>;
-        var btnAddInventor = document.querySelector('.btn-add-inventor'),
-            inventorList = document.getElementById('inventor-list');
-
-        function loadInventorData() {
-            inventorList.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px 0;">正在加载数据...</td></tr>';
-
-            var formData = new FormData();
-            formData.append('action', 'get_inventor_list');
-
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', 'modules/patent_management/edit_tabs/applicant.php?patent_id=' + patentId, true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        try {
-                            var response = JSON.parse(xhr.responseText);
-                            if (response.success) {
-                                inventorList.innerHTML = response.html;
-                                bindInventorTableRowClick();
-                            } else {
-                                inventorList.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px 0;">加载数据失败：' + (response.msg || '') + '</td></tr>';
-                            }
-                        } catch (e) {
-                            inventorList.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px 0;">加载数据失败：解析响应错误</td></tr>';
+                if (id && id !== '0') {
+                    this.elements.modalTitle.textContent = '编辑申请人';
+                    makeRequest('get_applicant', {
+                        id: id
+                    }, function(response) {
+                        if (response.success && response.data) {
+                            self.fillForm(response.data);
+                            toggleModal('edit-applicant-modal', true);
+                            self.bindFileUpload(id, true);
+                        } else {
+                            alert('获取数据失败：' + (response.msg || ''));
                         }
-                    } else {
-                        inventorList.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px 0;">加载数据失败，请稍后重试</td></tr>';
+                    }, '获取申请人数据失败');
+                } else {
+                    this.elements.modalTitle.textContent = '新增申请人';
+                    this.elements.form.id.value = '0';
+                    toggleModal('edit-applicant-modal', true);
+                    this.bindFileUpload(0, false);
+                }
+            },
+
+            fillForm: function(data) {
+                var form = this.elements.form;
+                for (var k in data) {
+                    if (form[k] !== undefined && form[k].type !== 'checkbox') {
+                        form[k].value = data[k] !== null ? data[k] : '';
                     }
                 }
-            };
-            xhr.send(formData);
-        }
 
-        function bindInventorTableRowClick() {
-            inventorList.querySelectorAll('tr[data-id]').forEach(function(row) {
-                row.querySelector('.btn-del').onclick = function() {
-                    if (!confirm('确定删除该发明人？')) return;
-                    var id = row.getAttribute('data-id');
-                    var formData = new FormData();
-                    formData.append('action', 'delete_inventor');
-                    formData.append('id', id);
-                    var xhr = new XMLHttpRequest();
-                    xhr.open('POST', 'modules/patent_management/edit_tabs/applicant.php?patent_id=' + patentId, true);
-                    xhr.onload = function() {
-                        try {
-                            var res = JSON.parse(xhr.responseText);
-                            if (res.success) {
-                                loadInventorData();
-                            } else {
-                                alert('删除失败：' + (res.msg || ''));
-                            }
-                        } catch (e) {
-                            alert('删除失败：响应解析错误');
-                        }
-                    };
-                    xhr.send(formData);
-                };
+                // 处理案件类型多选
+                if (data.case_type) {
+                    var arr = data.case_type.split(',');
+                    form.querySelectorAll('input[type=checkbox][name^=case_type_]').forEach(function(cb) {
+                        cb.checked = arr.indexOf(cb.value) !== -1;
+                    });
+                }
 
-                row.querySelector('.btn-edit').onclick = function() {
-                    var id = row.getAttribute('data-id');
-                    openInventorModal(id);
-                };
-            });
-        }
+                form.is_first_contact.checked = data.is_first_contact == 1;
+                form.is_receipt_title.checked = data.is_receipt_title == 1;
+                document.getElementById('receipt_title_row').style.display = form.is_receipt_title.checked ? '' : 'none';
+            },
 
-        function openInventorModal(id) {
-            var modal = document.getElementById('edit-inventor-modal');
-            var form = document.getElementById('edit-inventor-form');
-            var modalTitle = document.getElementById('inventor-modal-title');
+            save: function() {
+                var self = this;
+                var form = this.elements.form;
 
-            form.reset();
+                // 处理案件类型
+                var checkedTypes = Array.from(form.querySelectorAll('input[type=checkbox][name^=case_type_]:checked')).map(function(cb) {
+                    return cb.value;
+                });
+                form.case_type.value = checkedTypes.join(',');
 
-            if (id && id !== '0') {
-                // 编辑模式
-                modalTitle.textContent = '编辑发明人';
-                var formData = new FormData();
-                formData.append('action', 'get_inventor');
-                formData.append('id', id);
+                form.is_first_contact.value = form.is_first_contact.checked ? 1 : 0;
+                form.is_receipt_title.value = form.is_receipt_title.checked ? 1 : 0;
+
+                if (!form.is_receipt_title.checked) {
+                    form.receipt_title.value = '';
+                    form.credit_code.value = '';
+                }
+
+                var formData = new FormData(form);
+                formData.append('action', 'save_applicant');
 
                 var xhr = new XMLHttpRequest();
-                xhr.open('POST', 'modules/patent_management/edit_tabs/applicant.php?patent_id=' + patentId, true);
+                xhr.open('POST', API_URL, true);
                 xhr.onload = function() {
                     try {
                         var res = JSON.parse(xhr.responseText);
-                        if (res.success && res.data) {
-                            for (var k in res.data) {
-                                if (form[k] !== undefined) {
-                                    form[k].value = res.data[k] !== null ? res.data[k] : '';
-                                }
-                            }
-                            modal.style.display = 'flex';
+                        if (res.success) {
+                            toggleModal('edit-applicant-modal', false);
+                            self.loadData();
                         } else {
-                            alert('获取数据失败：' + (res.msg || ''));
+                            alert('保存失败：' + (res.msg || ''));
                         }
                     } catch (e) {
-                        alert('获取数据失败：响应解析错误');
+                        alert('保存失败：响应解析错误');
                     }
                 };
                 xhr.send(formData);
-            } else {
-                // 新增模式
-                modalTitle.textContent = '新增发明人';
-                form.id.value = '0';
-                modal.style.display = 'flex';
-            }
-        }
+            },
 
-        // 事件绑定
-        btnAddInventor.onclick = function() {
-            openInventorModal(0);
-        };
+            clearFileList: function() {
+                ['feijian-file-list', 'weituoshu-file-list', 'fujian-file-list'].forEach(function(id) {
+                    document.getElementById(id).innerHTML = '';
+                });
+                ['file-name-fee-reduction', 'file-name-power', 'file-name-attach'].forEach(function(id) {
+                    document.getElementById(id).value = '';
+                });
+                ['file-feijian', 'file-weituoshu', 'file-fujian'].forEach(function(id) {
+                    document.getElementById(id).value = '';
+                });
+            },
 
-        // 弹窗关闭
-        document.getElementById('edit-inventor-modal-close').onclick = function() {
-            document.getElementById('edit-inventor-modal').style.display = 'none';
-        };
-
-        document.querySelector('.btn-cancel-edit-inventor').onclick = function() {
-            document.getElementById('edit-inventor-modal').style.display = 'none';
-        };
-
-        // 弹窗保存
-        document.querySelector('.btn-save-edit-inventor').onclick = function() {
-            var form = document.getElementById('edit-inventor-form');
-            var formData = new FormData(form);
-            formData.append('action', 'save_inventor');
-
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', 'modules/patent_management/edit_tabs/applicant.php?patent_id=' + patentId, true);
-            xhr.onload = function() {
-                try {
-                    var res = JSON.parse(xhr.responseText);
-                    if (res.success) {
-                        document.getElementById('edit-inventor-modal').style.display = 'none';
-                        loadInventorData();
-                    } else {
-                        alert('保存失败：' + (res.msg || ''));
+            bindFileUpload: function(applicantId, loadFileList) {
+                var fileTypes = [{
+                        type: '费减证明',
+                        btnId: 'btn-upload-feijian',
+                        inputId: 'file-feijian',
+                        nameId: 'file-name-fee-reduction',
+                        listId: 'feijian-file-list'
+                    },
+                    {
+                        type: '总委托书',
+                        btnId: 'btn-upload-weituoshu',
+                        inputId: 'file-weituoshu',
+                        nameId: 'file-name-power',
+                        listId: 'weituoshu-file-list'
+                    },
+                    {
+                        type: '附件',
+                        btnId: 'btn-upload-fujian',
+                        inputId: 'file-fujian',
+                        nameId: 'file-name-attach',
+                        listId: 'fujian-file-list'
                     }
-                } catch (e) {
-                    alert('保存失败：响应解析错误');
-                }
-            };
-            xhr.send(formData);
+                ];
+
+                fileTypes.forEach(function(fileType) {
+                    document.getElementById(fileType.btnId).onclick = function() {
+                        uploadFile(fileType.type, fileType.inputId, fileType.nameId, fileType.listId, applicantId);
+                    };
+
+                    if (loadFileList && applicantId > 0) {
+                        renderFileList(applicantId, fileType.type, fileType.listId);
+                    }
+                });
+            }
         };
 
-        // 初始加载发明人数据
-        loadInventorData();
+        // 发明人管理模块
+        var InventorManager = {
+            elements: {
+                btnAdd: document.querySelector('.btn-add-inventor'),
+                list: document.getElementById('inventor-list'),
+                modal: document.getElementById('edit-inventor-modal'),
+                form: document.getElementById('edit-inventor-form'),
+                modalTitle: document.getElementById('inventor-modal-title')
+            },
+
+            init: function() {
+                this.bindEvents();
+                this.loadData();
+            },
+
+            bindEvents: function() {
+                var self = this;
+                this.elements.btnAdd.onclick = function() {
+                    self.openModal(0);
+                };
+                document.getElementById('edit-inventor-modal-close').onclick = function() {
+                    toggleModal('edit-inventor-modal', false);
+                };
+                document.querySelector('.btn-cancel-edit-inventor').onclick = function() {
+                    toggleModal('edit-inventor-modal', false);
+                };
+                document.querySelector('.btn-save-edit-inventor').onclick = function() {
+                    self.save();
+                };
+            },
+
+            loadData: function() {
+                var self = this;
+                this.elements.list.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px 0;">正在加载数据...</td></tr>';
+
+                makeRequest('get_inventor_list', null, function(response) {
+                    if (response.success) {
+                        self.elements.list.innerHTML = response.html;
+                        self.bindTableEvents();
+                    } else {
+                        self.elements.list.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px 0;">加载数据失败：' + (response.msg || '') + '</td></tr>';
+                    }
+                }, '加载发明人数据失败');
+            },
+
+            bindTableEvents: function() {
+                var self = this;
+                this.elements.list.querySelectorAll('tr[data-id]').forEach(function(row) {
+                    var id = row.getAttribute('data-id');
+                    row.querySelector('.btn-del').onclick = function() {
+                        confirmDelete('确定删除该发明人？', function() {
+                            makeRequest('delete_inventor', {
+                                id: id
+                            }, function(response) {
+                                if (response.success) {
+                                    self.loadData();
+                                } else {
+                                    alert('删除失败：' + (response.msg || ''));
+                                }
+                            }, '删除发明人失败');
+                        });
+                    };
+                    row.querySelector('.btn-edit').onclick = function() {
+                        self.openModal(id);
+                    };
+                });
+            },
+
+            openModal: function(id) {
+                var self = this;
+                this.elements.form.reset();
+
+                if (id && id !== '0') {
+                    this.elements.modalTitle.textContent = '编辑发明人';
+                    makeRequest('get_inventor', {
+                        id: id
+                    }, function(response) {
+                        if (response.success && response.data) {
+                            for (var k in response.data) {
+                                if (self.elements.form[k] !== undefined) {
+                                    self.elements.form[k].value = response.data[k] !== null ? response.data[k] : '';
+                                }
+                            }
+                            toggleModal('edit-inventor-modal', true);
+                        } else {
+                            alert('获取数据失败：' + (response.msg || ''));
+                        }
+                    }, '获取发明人数据失败');
+                } else {
+                    this.elements.modalTitle.textContent = '新增发明人';
+                    this.elements.form.id.value = '0';
+                    toggleModal('edit-inventor-modal', true);
+                }
+            },
+
+            save: function() {
+                var self = this;
+                var formData = new FormData(this.elements.form);
+                formData.append('action', 'save_inventor');
+
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', API_URL, true);
+                xhr.onload = function() {
+                    try {
+                        var res = JSON.parse(xhr.responseText);
+                        if (res.success) {
+                            toggleModal('edit-inventor-modal', false);
+                            self.loadData();
+                        } else {
+                            alert('保存失败：' + (res.msg || ''));
+                        }
+                    } catch (e) {
+                        alert('保存失败：响应解析错误');
+                    }
+                };
+                xhr.send(formData);
+            }
+        };
+
+        // 代理机构管理模块
+        var AgencyManager = {
+            elements: {
+                btnSelect: document.querySelector('.btn-select-agency'),
+                infoArea: document.getElementById('agency-info-area'),
+                basicInfo: document.getElementById('agency-basic-info'),
+                agentsList: document.getElementById('agency-agents-list'),
+                contactsList: document.getElementById('agency-contacts-list'),
+                modal: document.getElementById('agency-modal'),
+                form: document.getElementById('agency-form'),
+                modalTitle: document.getElementById('agency-modal-title')
+            },
+            currentData: null,
+
+            init: function() {
+                this.bindEvents();
+                this.loadData();
+            },
+
+            bindEvents: function() {
+                var self = this;
+                this.elements.btnSelect.onclick = function() {
+                    self.openModal(0);
+                };
+                document.querySelector('.btn-close-agency-modal').onclick = function() {
+                    toggleModal('agency-modal', false);
+                };
+                document.querySelector('.btn-cancel-agency').onclick = function() {
+                    toggleModal('agency-modal', false);
+                };
+                document.querySelector('.btn-save-agency').onclick = function() {
+                    self.save();
+                };
+
+                // 代理机构选择变化事件
+                document.addEventListener('change', function(e) {
+                    if (e.target.name === 'agency_id') {
+                        var agencyId = e.target.value;
+                        if (agencyId) {
+                            var tempCurrentData = self.currentData;
+                            self.currentData = null;
+                            self.loadAgencyAgents(agencyId);
+                            self.loadAgencyContacts(agencyId);
+                            if (tempCurrentData && tempCurrentData.agency_id == agencyId) {
+                                self.currentData = tempCurrentData;
+                            }
+                        } else {
+                            self.currentData = null;
+                            document.getElementById('agent-selection').innerHTML = '<span style="color:#999;">请先选择代理机构</span>';
+                            document.getElementById('contact-selection').innerHTML = '<span style="color:#999;">请先选择代理机构</span>';
+                        }
+                    }
+                });
+            },
+
+            loadData: function() {
+                var self = this;
+                makeRequest('load_agency', {
+                    patent_id: patentId
+                }, function(response) {
+                    if (response.success && response.data && response.data.length > 0) {
+                        self.currentData = response.data[0];
+                        self.showAgencyInfo(self.currentData);
+                    } else {
+                        self.showSelectButton();
+                    }
+                }, '加载代理机构数据失败');
+            },
+
+            showSelectButton: function() {
+                this.elements.btnSelect.style.display = 'inline-block';
+                this.elements.infoArea.style.display = 'none';
+                this.currentData = null;
+            },
+
+            showAgencyInfo: function(data) {
+                var self = this;
+                this.elements.btnSelect.style.display = 'none';
+                this.elements.infoArea.style.display = 'block';
+
+                // 显示基本信息
+                this.elements.basicInfo.innerHTML =
+                    '<tr data-id="' + data.id + '">' +
+                    '<td>' + (data.agency_name_cn || '') + '</td>' +
+                    '<td>' + (data.agency_code || '') + '</td>' +
+                    '<td>' + (data.remark || '') + '</td>' +
+                    '<td>' +
+                    '<button type="button" class="btn-mini btn-edit">编辑</button> ' +
+                    '<button type="button" class="btn-mini btn-delete">删除</button>' +
+                    '</td>' +
+                    '</tr>';
+
+                // 显示代理人和联系人列表
+                this.renderList(data.agents, this.elements.agentsList, ['序号', '姓名', '执业证号', '电话'], ['name_cn', 'license_no', 'phone']);
+                this.renderList(data.contacts, this.elements.contactsList, ['序号', '姓名', '手机', '邮箱'], ['name', 'mobile', 'work_email']);
+
+                // 绑定事件
+                var editBtn = this.elements.basicInfo.querySelector('.btn-edit');
+                var deleteBtn = this.elements.basicInfo.querySelector('.btn-delete');
+                var editDetailsBtn = document.querySelector('.btn-edit-agency-details');
+
+                if (editBtn) editBtn.onclick = function() {
+                    self.openModal(self.currentData.id);
+                };
+                if (deleteBtn) {
+                    deleteBtn.onclick = function() {
+                        confirmDelete('确定删除该代理机构？删除后将清空所有相关信息。', function() {
+                            makeRequest('delete_agency', {
+                                id: self.currentData.id
+                            }, function(response) {
+                                if (response.success) {
+                                    self.showSelectButton();
+                                } else {
+                                    alert('删除失败：' + (response.msg || ''));
+                                }
+                            }, '删除代理机构失败');
+                        });
+                    };
+                }
+                if (editDetailsBtn) editDetailsBtn.onclick = function() {
+                    self.openModal(self.currentData.id);
+                };
+            },
+
+            renderList: function(data, container, headers, fields) {
+                var html = '';
+                if (data && data.length > 0) {
+                    data.forEach(function(item, index) {
+                        html += '<tr><td>' + (index + 1) + '</td>';
+                        fields.forEach(function(field) {
+                            html += '<td>' + (item[field] || '') + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                } else {
+                    html = '<tr><td colspan="' + (headers.length) + '" style="text-align:center;color:#999;padding:15px 0;">暂无数据</td></tr>';
+                }
+                container.innerHTML = html;
+            },
+
+            openModal: function(id) {
+                var self = this;
+                this.elements.modalTitle.textContent = id && id > 0 ? '编辑代理机构' : '选择代理机构';
+                this.elements.form.reset();
+                this.elements.form.querySelector('input[name="id"]').value = id || 0;
+
+                document.getElementById('agent-selection').innerHTML = '<span style="color:#999;">请先选择代理机构</span>';
+                document.getElementById('contact-selection').innerHTML = '<span style="color:#999;">请先选择代理机构</span>';
+
+                this.loadAllAgencies(function() {
+                    if (id && id > 0 && self.currentData) {
+                        self.elements.form.querySelector('select[name="agency_id"]').value = self.currentData.agency_id || '';
+                        self.elements.form.querySelector('textarea[name="remark"]').value = self.currentData.remark || '';
+
+                        if (self.currentData.agency_id) {
+                            self.loadAgencyAgents(self.currentData.agency_id);
+                            self.loadAgencyContacts(self.currentData.agency_id);
+                        }
+                    }
+                });
+
+                toggleModal('agency-modal', true);
+            },
+
+            loadAllAgencies: function(callback) {
+                makeRequest('get_all_agencies', null, function(response) {
+                    if (response.success) {
+                        var agencySelect = document.querySelector('select[name="agency_id"]');
+                        agencySelect.innerHTML = '<option value="">--请选择代理机构--</option>';
+                        response.data.forEach(function(agency) {
+                            agencySelect.innerHTML += '<option value="' + agency.id + '">' + agency.agency_name_cn + ' (' + agency.agency_code + ')</option>';
+                        });
+                        if (callback) callback();
+                    }
+                }, '加载代理机构列表失败');
+            },
+
+            loadAgencyAgents: function(agencyId) {
+                var self = this;
+                makeRequest('get_agency_agents', {
+                    agency_id: agencyId
+                }, function(response) {
+                    if (response.success) {
+                        var html = '';
+                        if (response.data.length > 0) {
+                            response.data.forEach(function(agent) {
+                                var checked = '';
+                                if (self.currentData && self.currentData.agents) {
+                                    var found = self.currentData.agents.find(function(a) {
+                                        return a.id == agent.id;
+                                    });
+                                    if (found) checked = 'checked';
+                                }
+                                html += '<label style="display:block;margin:5px 0;"><input type="checkbox" name="agent_ids[]" value="' + agent.id + '" ' + checked + '> ' + agent.name_cn + ' (' + agent.license_no + ')</label>';
+                            });
+                        } else {
+                            html = '<span style="color:#999;">该代理机构暂无代理人</span>';
+                        }
+                        document.getElementById('agent-selection').innerHTML = html;
+                    }
+                }, '加载代理人失败');
+            },
+
+            loadAgencyContacts: function(agencyId) {
+                var self = this;
+                makeRequest('get_agency_contacts', {
+                    agency_id: agencyId
+                }, function(response) {
+                    if (response.success) {
+                        var html = '';
+                        if (response.data.length > 0) {
+                            response.data.forEach(function(contact) {
+                                var checked = '';
+                                if (self.currentData && self.currentData.contacts) {
+                                    var found = self.currentData.contacts.find(function(c) {
+                                        return c.id == contact.id;
+                                    });
+                                    if (found) checked = 'checked';
+                                }
+                                html += '<label style="display:block;margin:5px 0;"><input type="checkbox" name="contact_ids[]" value="' + contact.id + '" ' + checked + '> ' + contact.name + ' (' + contact.mobile + ')</label>';
+                            });
+                        } else {
+                            html = '<span style="color:#999;">该代理机构暂无联系人</span>';
+                        }
+                        document.getElementById('contact-selection').innerHTML = html;
+                    }
+                }, '加载联系人失败');
+            },
+
+            save: function() {
+                var self = this;
+                var form = this.elements.form;
+                var agencyId = form.querySelector('select[name="agency_id"]').value;
+
+                if (!agencyId) {
+                    alert('请选择代理机构');
+                    return;
+                }
+
+                var formData = new FormData(form);
+                formData.append('action', 'save_agency');
+                formData.append('patent_id', patentId);
+
+                var agentIds = [];
+                var contactIds = [];
+
+                form.querySelectorAll('input[name="agent_ids[]"]:checked').forEach(function(input) {
+                    agentIds.push(input.value);
+                });
+
+                form.querySelectorAll('input[name="contact_ids[]"]:checked').forEach(function(input) {
+                    contactIds.push(input.value);
+                });
+
+                formData.append('agent_ids', agentIds.join(','));
+                formData.append('contact_ids', contactIds.join(','));
+
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', API_URL, true);
+                xhr.onload = function() {
+                    try {
+                        var res = JSON.parse(xhr.responseText);
+                        if (res.success) {
+                            toggleModal('agency-modal', false);
+                            self.loadData();
+                        } else {
+                            alert('保存失败：' + (res.msg || ''));
+                        }
+                    } catch (e) {
+                        alert('保存失败：响应解析错误');
+                    }
+                };
+                xhr.send(formData);
+            }
+        };
+
+        // 初始化所有模块
+        ApplicantManager.init();
+        InventorManager.init();
+        AgencyManager.init();
     })();
 </script>
