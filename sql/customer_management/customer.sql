@@ -333,6 +333,7 @@ CREATE TABLE `agency_agent` (
     CONSTRAINT `fk_agency_agent_user` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代理机构代理人表';
 
+-- 代理机构要求表
 CREATE TABLE `agency_requirement` (
     `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
     `agency_id` INT(11) NOT NULL COMMENT '关联代理机构ID',

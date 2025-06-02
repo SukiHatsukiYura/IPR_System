@@ -10,3 +10,4 @@ alwaysApply: true
 - You can use markdown but dont have to
 1. 表单提交使用ajax提交，不要使用form表单提交。
 2. 允许直接查看整个项目的所有文件。
+3. php的版本限定在7.1.

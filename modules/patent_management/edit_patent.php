@@ -368,6 +368,7 @@ render_select_search_assets();
 </div>
 
 <!-- 处理事项编辑模态框 -->
+
 <div id="task-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;">
     <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:8px;padding:20px;width:90%;max-width:800px;max-height:90%;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid #eee;padding-bottom:10px;">
@@ -551,6 +552,14 @@ render_select_search_assets();
 
     // 处理事项相关函数
     function openTaskModal(taskId) {
+        // 动态设置模态框标题
+        var modalTitle = document.getElementById('modal-title');
+        if (taskId) {
+            modalTitle.textContent = '编辑处理事项';
+        } else {
+            modalTitle.textContent = '新增处理事项';
+        }
+
         document.getElementById('task-modal').style.display = 'flex';
 
         if (taskId) {

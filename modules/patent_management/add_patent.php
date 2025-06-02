@@ -3,66 +3,16 @@ session_start();
 include_once(__DIR__ . '/../../database.php');
 check_access_via_framework();
 
-// 调试：记录每次页面加载
-error_log('[add_patent.php] 页面被加载，时间：' . date('Y-m-d H:i:s') . ', session_id: ' . session_id());
-
-// 调试输出session变量
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    echo '<script>console.log("[add_patent.php] Session variables:", ' . json_encode($_SESSION) . ');</script>';
-}
-
 // 检查是否通过框架访问
 if (!isset($_SERVER['HTTP_REFERER']) || strpos($_SERVER['HTTP_REFERER'], 'index.php') === false) {
-    error_log('[add_patent.php] 非法访问，跳转首页');
     header('Location: /index.php');
     exit;
 }
 
 // 检查用户权限
 if (!isset($_SESSION['user_id'])) {
-    error_log('[add_patent.php] 未登录，跳转登录页');
     header('Location: /login.php');
     exit;
-}
-
-// 调试输出编辑模式判断
-$is_edit_mode = false;
-$patent = null;
-$patent_id = 0;
-
-if (isset($_GET['id']) && intval($_GET['id']) > 0) {
-    $patent_id = intval($_GET['id']);
-    error_log('[add_patent.php] Edit mode from URL param, patent_id: ' . $patent_id);
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        echo '<script>console.log("[add_patent.php] Edit mode from URL param, patent_id:", ' . $patent_id . ');</script>';
-    }
-    $is_edit_mode = true;
-} elseif (isset($_SESSION['edit_patent_id']) && intval($_SESSION['edit_patent_id']) > 0) {
-    $patent_id = intval($_SESSION['edit_patent_id']);
-    error_log('[add_patent.php] Edit mode from session, patent_id: ' . $patent_id);
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        echo '<script>console.log("[add_patent.php] Edit mode from session, patent_id:", ' . $patent_id . ');</script>';
-    }
-    unset($_SESSION['edit_patent_id']);
-    $is_edit_mode = true;
-} else {
-    error_log('[add_patent.php] 新建模式，无patent_id');
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        echo '<script>console.log("[add_patent.php] New mode - no patent_id found");</script>';
-    }
-}
-
-if ($patent_id > 0) {
-    $patent_stmt = $pdo->prepare("SELECT * FROM patent_case_info WHERE id = ?");
-    $patent_stmt->execute([$patent_id]);
-    $patent = $patent_stmt->fetch();
-    if (!$patent) {
-        $error = '未找到该专利信息';
-        $is_edit_mode = false;
-        error_log('[add_patent.php] 未找到专利信息，patent_id: ' . $patent_id);
-    } else {
-        error_log('[add_patent.php] 成功加载专利信息，patent_id: ' . $patent_id);
-    }
 }
 
 // 静态下拉选项
@@ -174,35 +124,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         exit;
     }
     try {
-        if ($is_edit_mode && $patent_id > 0) {
-            // 编辑模式 - 执行UPDATE操作
-            $data['id'] = $patent_id;
-            $fields = [];
-            foreach ($data as $key => $value) {
-                if ($key !== 'id') {
-                    $fields[] = "$key = :$key";
-                }
-            }
-            $sql = "UPDATE patent_case_info SET " . implode(', ', $fields) . " WHERE id = :id";
-            $stmt = $pdo->prepare($sql);
-            foreach ($data as $k => $v) {
-                $stmt->bindValue(":$k", $v);
-            }
-            $ok = $stmt->execute();
-            echo json_encode(['success' => $ok]);
-        } else {
-            // 新增模式 - 自动生成唯一文号并执行INSERT操作
-            $data['case_code'] = generate_case_code($pdo);
-            $fields = implode(',', array_keys($data));
-            $placeholders = ':' . implode(', :', array_keys($data));
-            $sql = "INSERT INTO patent_case_info ($fields) VALUES ($placeholders)";
-            $stmt = $pdo->prepare($sql);
-            foreach ($data as $k => $v) {
-                $stmt->bindValue(":$k", $v);
-            }
-            $ok = $stmt->execute();
-            echo json_encode(['success' => $ok]);
+        // 新增模式 - 自动生成唯一文号并执行INSERT操作
+        $data['case_code'] = generate_case_code($pdo);
+        $fields = implode(',', array_keys($data));
+        $placeholders = ':' . implode(', :', array_keys($data));
+        $sql = "INSERT INTO patent_case_info ($fields) VALUES ($placeholders)";
+        $stmt = $pdo->prepare($sql);
+        foreach ($data as $k => $v) {
+            $stmt->bindValue(":$k", $v);
         }
+        $ok = $stmt->execute();
+        echo json_encode(['success' => $ok]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'msg' => '数据库异常:' . $e->getMessage()]);
     }
@@ -378,253 +310,228 @@ function renderUserSearch($name, $data, $multi = false, $post_val = '')
     </script>';
     return $html . $script;
 }
+
+include_once(__DIR__ . '/../../common/functions.php');
 ?>
-<div class="module-panel">
-    <div class="module-btns">
-        <button type="button" class="btn-save"><i class="icon-save"></i> 保存</button>
-        <button type="button" class="btn-cancel"><i class="icon-cancel"></i> 取消</button>
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>新增专利</title>
+    <link rel="stylesheet" href="../../css/module.css">
+    <?php render_select_search_assets(); ?>
+</head>
+
+<body>
+    <div class="module-panel">
+        <div class="module-btns">
+            <button type="button" class="btn-save"><i class="icon-save"></i> 保存</button>
+            <button type="button" class="btn-cancel"><i class="icon-cancel"></i> 取消</button>
+        </div>
+        <h3 style="text-align:center;margin-bottom:15px;">新增专利</h3>
+        <form id="add-patent-form" class="module-form" autocomplete="off">
+            <table class="module-table" style="width:100%;max-width:1800px;table-layout:fixed;">
+                <colgroup>
+                    <col style="width:120px;">
+                    <col style="width:220px;">
+                    <col style="width:120px;">
+                    <col style="width:220px;">
+                    <col style="width:120px;">
+                    <col style="width:220px;">
+                </colgroup>
+                <tr>
+                    <td class="module-label">我方文号</td>
+                    <td><input type="text" name="case_code" class="module-input" value="系统自动生成" readonly></td>
+                    <td class="module-label module-req">*承办部门</td>
+                    <td>
+                        <?php echo renderUserSearch('business_dept_id', $departments, false, ''); ?>
+                    </td>
+                    <td class="module-label">开卷日期</td>
+                    <td><input type="date" name="open_date" class="module-input" value=""></td>
+                </tr>
+                <tr>
+                    <td class="module-label">客户文号</td>
+                    <td><input type="text" name="client_case_code" class="module-input" value=""></td>
+                    <td class="module-label module-req">*案件名称</td>
+                    <td><input type="text" name="case_name" class="module-input" value="" required></td>
+                    <td class="module-label">英文名称</td>
+                    <td><input type="text" name="case_name_en" class="module-input" value=""></td>
+                </tr>
+                <tr>
+                    <td class="module-label module-req">*处理事项</td>
+                    <td>
+                        <?php echo renderUserSearch('process_item', $process_items, false, ''); ?>
+                    </td>
+                    <td class="module-label module-req">*客户名称</td>
+                    <td>
+                        <?php echo renderUserSearch('client_id', $customers, false, ''); ?>
+                    </td>
+                    <td class="module-label">业务类型</td>
+                    <td>
+                        <?php echo renderUserSearch('business_type', $business_types, false, ''); ?>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="module-label">委案日期</td>
+                    <td><input type="date" name="entrust_date" class="module-input" value=""></td>
+                    <td class="module-label">案件状态</td>
+                    <td>
+                        <?php echo render_select('case_status', $case_statuses, ''); ?>
+                    </td>
+                    <td class="module-label">同日申请</td>
+                    <td><input type="text" name="same_day_apply" class="module-input" value="" placeholder="逗号分隔"></td>
+                </tr>
+                <tr>
+                    <td class="module-label">同日递交</td>
+                    <td><input type="text" name="same_day_submit" class="module-input" value="" placeholder="逗号分隔"></td>
+                    <td class="module-label">代理费规则</td>
+                    <td colspan="3">
+                        <label><input type="radio" name="agent_rule" value="自定义">自定义</label>
+                        <label><input type="radio" name="agent_rule" value="纯包">纯包</label>
+                        <label><input type="radio" name="agent_rule" value="按项" checked>按项</label>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="module-label">业务人员</td>
+                    <td colspan="5">
+                        <?php echo renderUserSearch('business_user_ids', $users, true, ''); ?>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="module-label">业务助理</td>
+                    <td colspan="5">
+                        <?php echo renderUserSearch('business_assistant_ids', $users, true, ''); ?>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="module-label module-req">*申请类型</td>
+                    <td>
+                        <?php echo render_select('application_type', $application_types, ''); ?>
+                    </td>
+                    <td class="module-label module-req">*是否配案</td>
+                    <td>
+                        <label><input type="radio" name="is_allocated" value="1" checked>是</label>
+                        <label><input type="radio" name="is_allocated" value="0">否</label>
+                    </td>
+                    <td class="module-label">国家(地区)</td>
+                    <td>
+                        <?php echo render_select('country', $countries, ''); ?>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="module-label">案件流向</td>
+                    <td>
+                        <?php echo render_select('case_flow', $case_flows, ''); ?>
+                    </td>
+                    <td class="module-label">起始阶段</td>
+                    <td>
+                        <?php echo render_select('start_stage', $start_stages, ''); ?>
+                    </td>
+                    <td class="module-label">客户状态</td>
+                    <td>
+                        <?php echo render_select('client_status', $client_statuses, ''); ?>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="module-label">案源国</td>
+                    <td>
+                        <?php echo render_select('source_country', $source_countries, ''); ?>
+                    </td>
+                    <td class="module-label">其他</td>
+                    <td colspan="3">
+                        <?php foreach ($other_options as $v): ?>
+                            <label style="margin-right:12px;"><input type="checkbox" name="other_options[]" value="<?= h($v) ?>"> <?= h($v) ?></label>
+                        <?php endforeach; ?>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="module-label">申请号</td>
+                    <td><input type="text" name="application_no" class="module-input" value=""></td>
+                    <td class="module-label">申请日</td>
+                    <td><input type="date" name="application_date" class="module-input" value=""></td>
+                    <td class="module-label">公开号</td>
+                    <td><input type="text" name="publication_no" class="module-input" value=""></td>
+                </tr>
+                <tr>
+                    <td class="module-label">公开日</td>
+                    <td><input type="date" name="publication_date" class="module-input" value=""></td>
+                    <td class="module-label">处理人</td>
+                    <td>
+                        <?php echo renderUserSearch('handler_id', $users, false, ''); ?>
+                    </td>
+                    <td class="module-label">公告号</td>
+                    <td><input type="text" name="announcement_no" class="module-input" value=""></td>
+                </tr>
+                <tr>
+                    <td class="module-label">公告日</td>
+                    <td><input type="date" name="announcement_date" class="module-input" value=""></td>
+                    <td class="module-label">证书号</td>
+                    <td><input type="text" name="certificate_no" class="module-input" value=""></td>
+                    <td class="module-label">属满日</td>
+                    <td><input type="date" name="expire_date" class="module-input" value=""></td>
+                </tr>
+                <tr>
+                    <td class="module-label">进入实审日</td>
+                    <td><input type="date" name="enter_substantive_date" class="module-input" value=""></td>
+                    <td class="module-label">申请方式</td>
+                    <td colspan="3">
+                        <?php echo render_select('application_mode', $application_modes, ''); ?>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="module-label">案件备注</td>
+                    <td colspan="5" style="width:100%"><textarea name="remarks" class="module-input" style="min-height:48px;width:100%;resize:vertical;"></textarea></td>
+                </tr>
+            </table>
+        </form>
     </div>
-    <h3 style="text-align:center;margin-bottom:15px;">
-        <?= $is_edit_mode ? '编辑专利' : '新增专利' ?>
-    </h3>
-    <form id="add-patent-form" class="module-form" autocomplete="off">
-        <table class="module-table" style="width:100%;max-width:1800px;table-layout:fixed;">
-            <colgroup>
-                <col style="width:120px;">
-                <col style="width:220px;">
-                <col style="width:120px;">
-                <col style="width:220px;">
-                <col style="width:120px;">
-                <col style="width:220px;">
-            </colgroup>
-            <tr>
-                <td class="module-label">我方文号</td>
-                <td><input type="text" name="case_code" class="module-input" value="<?= $is_edit_mode ? h($patent['case_code']) : '系统自动生成' ?>" readonly></td>
-                <td class="module-label module-req">*承办部门</td>
-                <td>
-                    <?php echo renderUserSearch('business_dept_id', $departments, false, $is_edit_mode ? $patent['business_dept_id'] : ''); ?>
-                </td>
-                <td class="module-label">开卷日期</td>
-                <td><input type="date" name="open_date" class="module-input" value="<?= $is_edit_mode ? h($patent['open_date']) : '' ?>"></td>
-            </tr>
-            <tr>
-                <td class="module-label">客户文号</td>
-                <td><input type="text" name="client_case_code" class="module-input" value="<?= $is_edit_mode ? h($patent['client_case_code']) : '' ?>"></td>
-                <td class="module-label module-req">*案件名称</td>
-                <td><input type="text" name="case_name" class="module-input" value="<?= $is_edit_mode ? h($patent['case_name']) : '' ?>" required></td>
-                <td class="module-label">英文名称</td>
-                <td><input type="text" name="case_name_en" class="module-input" value="<?= $is_edit_mode ? h($patent['case_name_en']) : '' ?>"></td>
-            </tr>
-            <tr>
-                <td class="module-label module-req">*处理事项</td>
-                <td>
-                    <?php echo renderUserSearch('process_item', $process_items, false, $is_edit_mode ? $patent['process_item'] : ''); ?>
-                </td>
-                <td class="module-label module-req">*客户名称</td>
-                <td>
-                    <?php echo renderUserSearch('client_id', $customers, false, $is_edit_mode ? $patent['client_id'] : ''); ?>
-                </td>
-                <td class="module-label">业务类型</td>
-                <td>
-                    <?php echo renderUserSearch('business_type', $business_types, false, $is_edit_mode ? $patent['business_type'] : ''); ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="module-label">委案日期</td>
-                <td><input type="date" name="entrust_date" class="module-input" value="<?= $is_edit_mode ? h($patent['entrust_date']) : '' ?>"></td>
-                <td class="module-label">案件状态</td>
-                <td>
-                    <?php echo render_select('case_status', $case_statuses, $is_edit_mode ? $patent['case_status'] : ''); ?>
-                </td>
-                <td class="module-label">同日申请</td>
-                <td><input type="text" name="same_day_apply" class="module-input" value="<?= $is_edit_mode ? h($patent['same_day_apply']) : '' ?>" placeholder="逗号分隔"></td>
-            </tr>
-            <tr>
-                <td class="module-label">同日递交</td>
-                <td><input type="text" name="same_day_submit" class="module-input" value="<?= $is_edit_mode ? h($patent['same_day_submit']) : '' ?>" placeholder="逗号分隔"></td>
-                <td class="module-label">代理费规则</td>
-                <td colspan="3">
-                    <label><input type="radio" name="agent_rule" value="自定义" <?= $is_edit_mode && $patent['agent_rule'] === '自定义' ? 'checked' : '' ?>>自定义</label>
-                    <label><input type="radio" name="agent_rule" value="纯包" <?= $is_edit_mode && $patent['agent_rule'] === '纯包' ? 'checked' : '' ?>>纯包</label>
-                    <label><input type="radio" name="agent_rule" value="按项" <?= ($is_edit_mode && $patent['agent_rule'] === '按项') || (!$is_edit_mode) ? 'checked' : '' ?>>按项</label>
-                </td>
-            </tr>
-            <tr>
-                <td class="module-label">业务人员</td>
-                <td colspan="5">
-                    <?php echo renderUserSearch('business_user_ids', $users, true, $is_edit_mode ? $patent['business_user_ids'] : ''); ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="module-label">业务助理</td>
-                <td colspan="5">
-                    <?php echo renderUserSearch('business_assistant_ids', $users, true, $is_edit_mode ? $patent['business_assistant_ids'] : ''); ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="module-label module-req">*申请类型</td>
-                <td>
-                    <?php echo render_select('application_type', $application_types, $is_edit_mode ? $patent['application_type'] : ''); ?>
-                </td>
-                <td class="module-label module-req">*是否配案</td>
-                <td>
-                    <label><input type="radio" name="is_allocated" value="1" <?= ($is_edit_mode ? $patent['is_allocated'] : 1) == 1 ? 'checked' : '' ?>>是</label>
-                    <label><input type="radio" name="is_allocated" value="0" <?= $is_edit_mode && $patent['is_allocated'] == 0 ? 'checked' : '' ?>>否</label>
-                </td>
-                <td class="module-label">国家(地区)</td>
-                <td>
-                    <?php echo render_select('country', $countries, $is_edit_mode ? $patent['country'] : ''); ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="module-label">案件流向</td>
-                <td>
-                    <?php echo render_select('case_flow', $case_flows, $is_edit_mode ? $patent['case_flow'] : ''); ?>
-                </td>
-                <td class="module-label">起始阶段</td>
-                <td>
-                    <?php echo render_select('start_stage', $start_stages, $is_edit_mode ? $patent['start_stage'] : ''); ?>
-                </td>
-                <td class="module-label">客户状态</td>
-                <td>
-                    <?php echo render_select('client_status', $client_statuses, $is_edit_mode ? $patent['client_status'] : ''); ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="module-label">案源国</td>
-                <td>
-                    <?php echo render_select('source_country', $source_countries, $is_edit_mode ? $patent['source_country'] : ''); ?>
-                </td>
-                <td class="module-label">其他</td>
-                <td colspan="3">
-                    <?php foreach ($other_options as $v): ?>
-                        <label style="margin-right:12px;"><input type="checkbox" name="other_options[]" value="<?= h($v) ?>" <?= $is_edit_mode && strpos("," . $patent['other_options'] . ",", "," . h($v) . ",") !== false ? 'checked' : '' ?>> <?= h($v) ?></label>
-                    <?php endforeach; ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="module-label">申请号</td>
-                <td><input type="text" name="application_no" class="module-input" value="<?= $is_edit_mode ? h($patent['application_no']) : '' ?>"></td>
-                <td class="module-label">申请日</td>
-                <td><input type="date" name="application_date" class="module-input" value="<?= $is_edit_mode ? h($patent['application_date']) : '' ?>"></td>
-                <td class="module-label">公开号</td>
-                <td><input type="text" name="publication_no" class="module-input" value="<?= $is_edit_mode ? h($patent['publication_no']) : '' ?>"></td>
-            </tr>
-            <tr>
-                <td class="module-label">公开日</td>
-                <td><input type="date" name="publication_date" class="module-input" value="<?= $is_edit_mode ? h($patent['publication_date']) : '' ?>"></td>
-                <td class="module-label">处理人</td>
-                <td>
-                    <?php echo renderUserSearch('handler_id', $users, false, $is_edit_mode ? $patent['handler_id'] : ''); ?>
-                </td>
-                <td class="module-label">公告号</td>
-                <td><input type="text" name="announcement_no" class="module-input" value="<?= $is_edit_mode ? h($patent['announcement_no']) : '' ?>"></td>
-            </tr>
-            <tr>
-                <td class="module-label">公告日</td>
-                <td><input type="date" name="announcement_date" class="module-input" value="<?= $is_edit_mode ? h($patent['announcement_date']) : '' ?>"></td>
-                <td class="module-label">证书号</td>
-                <td><input type="text" name="certificate_no" class="module-input" value="<?= $is_edit_mode ? h($patent['certificate_no']) : '' ?>"></td>
-                <td class="module-label">属满日</td>
-                <td><input type="date" name="expire_date" class="module-input" value="<?= $is_edit_mode ? h($patent['expire_date']) : '' ?>"></td>
-            </tr>
-            <tr>
-                <td class="module-label">进入实审日</td>
-                <td><input type="date" name="enter_substantive_date" class="module-input" value="<?= $is_edit_mode ? h($patent['enter_substantive_date']) : '' ?>"></td>
-                <td class="module-label">申请方式</td>
-                <td colspan="3">
-                    <?php echo render_select('application_mode', $application_modes, $is_edit_mode ? $patent['application_mode'] : ''); ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="module-label">案件备注</td>
-                <td colspan="5" style="width:100%"><textarea name="remarks" class="module-input" style="min-height:48px;width:100%;resize:vertical;"><?= $is_edit_mode ? h($patent['remarks']) : '' ?></textarea></td>
-            </tr>
-        </table>
-    </form>
-</div>
-<script>
-    (function() {
-        var form = document.getElementById('add-patent-form'),
-            btnSave = document.querySelector('.btn-save'),
-            btnCancel = document.querySelector('.btn-cancel');
+    <script>
+        (function() {
+            var form = document.getElementById('add-patent-form'),
+                btnSave = document.querySelector('.btn-save'),
+                btnCancel = document.querySelector('.btn-cancel');
 
-        // 初始化多选框
-        var otherOptions = <?= $is_edit_mode && $patent['other_options'] ? json_encode(explode(',', $patent['other_options'])) : '[]' ?>;
-        if (otherOptions.length > 0) {
-            document.querySelectorAll('[name="other_options[]"]').forEach(function(cb) {
-                if (otherOptions.indexOf(cb.value) !== -1) {
-                    cb.checked = true;
+            // 保存按钮AJAX提交
+            btnSave.onclick = function() {
+                var required = ['case_name', 'business_dept_id', 'process_item', 'client_id', 'application_type', 'is_allocated'];
+                for (var i = 0; i < required.length; i++) {
+                    var el = form.querySelector('[name="' + required[i] + '"]');
+                    if (!el || !el.value.trim()) {
+                        alert('请填写所有必填项');
+                        el && el.focus();
+                        return;
+                    }
                 }
-            });
-        }
-
-        // 保存按钮AJAX提交
-        btnSave.onclick = function() {
-            var required = ['case_name', 'business_dept_id', 'process_item', 'client_id', 'application_type', 'is_allocated'];
-            for (var i = 0; i < required.length; i++) {
-                var el = form.querySelector('[name="' + required[i] + '"]');
-                if (!el || !el.value.trim()) {
-                    alert('请填写所有必填项');
-                    el && el.focus();
-                    return;
-                }
-            }
-            var fd = new FormData(form);
-            fd.append('action', 'save');
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', 'modules/patent_management/add_patent.php<?= $is_edit_mode ? "?id={$patent_id}" : "" ?>', true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    try {
-                        var res = JSON.parse(xhr.responseText);
-                        if (res.success) {
-                            alert('保存成功');
-                            <?php if ($is_edit_mode): ?>
-                                // 编辑模式成功后询问是否返回列表页
-                                if (confirm('编辑成功，是否返回专利查询页面？')) {
-                                    if (window.parent.openTab) {
-                                        window.parent.openTab(1, 5, 0); // 专利管理-案件管理-专利查询
-                                    } else {
-                                        alert('框架导航功能不可用');
-                                    }
-                                }
-                            <?php else: ?>
+                var fd = new FormData(form);
+                fd.append('action', 'save');
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', 'modules/patent_management/add_patent.php', true);
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        try {
+                            var res = JSON.parse(xhr.responseText);
+                            if (res.success) {
+                                alert('保存成功');
                                 form.reset();
                                 // 重置所有下拉搜索框
                                 document.querySelectorAll('.module-select-search-input').forEach(i => i.value = '');
                                 document.querySelectorAll('.module-select-search-box input[type=hidden]').forEach(i => i.value = '');
                                 document.querySelectorAll('.module-select-search-multi-input').forEach(i => i.value = '');
                                 document.querySelectorAll('.module-select-search-multi-box input[type=hidden]').forEach(i => i.value = '');
-                            <?php endif; ?>
-                        } else {
-                            alert(res.msg || '保存失败');
+                            } else {
+                                alert(res.msg || '保存失败');
+                            }
+                        } catch (e) {
+                            alert('保存失败：' + xhr.responseText);
                         }
-                    } catch (e) {
-                        console.error('保存失败，响应内容不是JSON');
-                        console.log('xhr.status:', xhr.status);
-                        console.log('xhr.responseURL:', xhr.responseURL);
-                        console.log('xhr.responseText:', xhr.responseText);
-                        console.log('异常信息:', e);
-                        alert('保存失败：' + xhr.responseText);
                     }
-                }
+                };
+                xhr.send(fd);
             };
-            xhr.send(fd);
-        };
 
-        // 取消按钮
-        btnCancel.onclick = function() {
-            <?php if ($is_edit_mode): ?>
-                // 编辑模式取消返回列表页
-                if (confirm('确定取消编辑并返回专利查询页面？')) {
-                    if (window.parent.openTab) {
-                        window.parent.openTab(1, 5, 0); // 专利管理-案件管理-专利查询
-                    } else {
-                        alert('框架导航功能不可用');
-                    }
-                }
-            <?php else: ?>
+            // 取消按钮
+            btnCancel.onclick = function() {
                 if (confirm('确定要取消吗？未保存的内容将丢失')) {
                     form.reset();
                     // 重置所有下拉搜索框
@@ -633,22 +540,9 @@ function renderUserSearch($name, $data, $multi = false, $post_val = '')
                     document.querySelectorAll('.module-select-search-multi-input').forEach(i => i.value = '');
                     document.querySelectorAll('.module-select-search-multi-box input[type=hidden]').forEach(i => i.value = '');
                 }
-            <?php endif; ?>
-        };
-    })();
+            };
+        })();
+    </script>
+</body>
 
-    // 在JavaScript部分添加调试输出
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('Page loaded, edit mode:', <?php echo $is_edit_mode ? 'true' : 'false'; ?>);
-        console.log('Form title:', document.querySelector('.module-panel h2').textContent);
-        console.log('Save button text:', document.querySelector('.btn-save').textContent);
-
-        // 检查表单字段值
-        const form = document.getElementById('patent-form');
-        const formData = new FormData(form);
-        console.log('Form field values:');
-        for (let [key, value] of formData.entries()) {
-            console.log(key + ':', value);
-        }
-    });
-</script>
+</html>
