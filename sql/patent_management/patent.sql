@@ -1,3 +1,4 @@
+-- 专利案件基本信息表
 CREATE TABLE `patent_case_info` (
     `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
     `case_code` VARCHAR(50) NOT NULL COMMENT '我方文号/系统编号',
@@ -50,6 +51,8 @@ CREATE TABLE `patent_case_info` (
     CONSTRAINT `fk_patent_case_info_handler` FOREIGN KEY (`handler_id`) REFERENCES `user`(`id`),
     CONSTRAINT `fk_patent_case_info_project_leader` FOREIGN KEY (`project_leader_id`) REFERENCES `user`(`id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '专利案件表';
+
+
 
 -- 专利案件扩展信息表
 CREATE TABLE `patent_case_extend_info` (
@@ -334,3 +337,55 @@ CREATE TABLE `patent_case_agency` (
     CONSTRAINT `fk_patent_case_agency_agent` FOREIGN KEY (`agency_agent_id`) REFERENCES `agency_agent`(`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_patent_case_agency_contact` FOREIGN KEY (`agency_contact_id`) REFERENCES `agency_contact`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='专利案件代理机构关联表';
+
+-- 专利案件官费表
+CREATE TABLE `patent_case_official_fee` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `patent_case_info_id` INT(11) NOT NULL COMMENT '关联专利案件ID',
+    `sequence_no` INT(11) DEFAULT NULL COMMENT '序号',
+    `fee_name` VARCHAR(200) NOT NULL COMMENT '费用名称',
+    `fee_reduction_type` ENUM('基础费用', '单位费减', '个人费减') DEFAULT '基础费用' COMMENT '费减类型',
+    `currency` VARCHAR(10) DEFAULT 'CNY' COMMENT '币别',
+    `amount` DECIMAL(12, 2) DEFAULT NULL COMMENT '金额',
+    `quantity` INT(11) DEFAULT 1 COMMENT '数量',
+    `actual_currency` VARCHAR(10) DEFAULT 'CNY' COMMENT '实际币别',
+    `actual_amount` DECIMAL(12, 2) DEFAULT NULL COMMENT '实际金额',
+    `receivable_date` DATE DEFAULT NULL COMMENT '应收日期',
+    `received_date` DATE DEFAULT NULL COMMENT '实收日期',
+    `official_deadline` DATE DEFAULT NULL COMMENT '官方期限',
+    `paid_date` DATE DEFAULT NULL COMMENT '实付日期',
+    `task_item` VARCHAR(100) DEFAULT NULL COMMENT '处理事项',
+    `is_verified` TINYINT(1) DEFAULT 0 COMMENT '是否核查(1是0否)',
+    `remarks` TEXT COMMENT '备注',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_patent_case_info_id` (`patent_case_info_id`),
+    KEY `idx_fee_name` (`fee_name`),
+    KEY `idx_receivable_date` (`receivable_date`),
+    KEY `idx_official_deadline` (`official_deadline`),
+    KEY `idx_task_item` (`task_item`),
+    CONSTRAINT `fk_official_fee_patent_case` FOREIGN KEY (`patent_case_info_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '专利案件官费表';
+
+-- 专利案件文件表
+CREATE TABLE `patent_case_file` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `patent_case_info_id` INT(11) NOT NULL COMMENT '关联专利案件ID',
+    `file_type` VARCHAR(50) NOT NULL COMMENT '文件类型（申请书/说明书/权利要求书/附图/审查意见/答复意见/其他）',
+    `file_name` VARCHAR(200) NOT NULL COMMENT '文件名',
+    `file_path` VARCHAR(300) NOT NULL COMMENT '文件存储路径',
+    `file_size` BIGINT DEFAULT NULL COMMENT '文件大小（字节）',
+    `mime_type` VARCHAR(100) DEFAULT NULL COMMENT '文件MIME类型',
+    `upload_user_id` INT(11) DEFAULT NULL COMMENT '上传人ID，关联user表',
+    `official_issue_date` DATE DEFAULT NULL COMMENT '官方发文日（可选）',
+    `remarks` TEXT COMMENT '备注说明',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_patent_case_info_id` (`patent_case_info_id`),
+    KEY `idx_file_type` (`file_type`),
+    KEY `idx_upload_user_id` (`upload_user_id`),
+    CONSTRAINT `fk_patent_case_file_case` FOREIGN KEY (`patent_case_info_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_patent_case_file_user` FOREIGN KEY (`upload_user_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '专利案件文件表';

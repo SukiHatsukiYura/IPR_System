@@ -1,0 +1,95 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 专利管理模块开发指南
+
+## 模块结构
+专利管理模块位于`modules/patent_management/`，采用选项卡式编辑界面。
+
+### 编辑页面结构
+专利编辑页面使用选项卡模式，参考[modules/patent_management/edit_tabs/basic.php](mdc:modules/patent_management/edit_tabs/basic.php)：
+
+#### 标准选项卡文件结构
+```php
+<?php
+// 1. 引入必要文件
+include_once(__DIR__ . '/../../../database.php');
+include_once(__DIR__ . '/../../../common/functions.php');
+check_access_via_framework();
+session_start();
+
+// 2. 验证参数和权限
+if (!isset($_GET['patent_id']) || intval($_GET['patent_id']) <= 0) {
+    echo '<div class="module-error">未指定专利ID</div>';
+    exit;
+}
+
+// 3. 处理POST请求（保存数据）
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    header('Content-Type: application/json');
+    // 处理保存逻辑
+    exit;
+}
+
+// 4. 输出页面内容
+render_select_search_assets(); // 如果使用下拉框组件
+?>
+```
+
+### 表单设计模式
+参考[modules/patent_management/edit_tabs/fee.php](mdc:modules/patent_management/edit_tabs/fee.php)的费用管理实现：
+
+#### 标准表格布局
+- 使用`.module-table`类
+- 固定列宽使用`colgroup`
+- 标签列使用`.module-label`类
+- 必填字段使用`.module-req`类
+
+#### 按钮区域
+```html
+<div class="module-btns">
+    <button type="button" class="btn-save">保存</button>
+    <button type="button" class="btn-cancel">取消</button>
+</div>
+```
+
+## 数据库交互模式
+### 查询模式
+```php
+$stmt = $pdo->prepare("SELECT * FROM patent_case_info WHERE id = ?");
+$stmt->execute([$patent_id]);
+$patent = $stmt->fetch();
+```
+
+### 更新模式
+```php
+try {
+    $sql = "UPDATE table_name SET " . implode(',', $set) . " WHERE id = :id";
+    $stmt = $pdo->prepare($sql);
+    $result = $stmt->execute($data);
+    echo json_encode(['success' => $result, 'msg' => $result ? null : '更新失败']);
+} catch (PDOException $e) {
+    echo json_encode(['success' => false, 'msg' => '数据库异常: ' . $e->getMessage()]);
+}
+```
+
+## 核心数据表
+参考[sql/patent_management/patent.sql](mdc:sql/patent_management/patent.sql)：
+- `patent_case_info` - 专利案件基本信息
+- `patent_case_extend_info` - 专利案件扩展信息  
+- `patent_case_applicant` - 专利案件申请人
+- `patent_case_inventor` - 专利案件发明人
+- `patent_case_agency` - 专利案件代理机构
+- `patent_case_official_fee` - 专利案件官费
+- `patent_case_task` - 专利案件处理事项
+
+## JavaScript事件处理
+选项卡页面的JavaScript应该：
+1. 定义初始化函数（如`initPatentTabEvents()`）
+2. 处理保存和取消按钮事件
+3. 在DOM加载完成时自动初始化
+4. 支持动态重新加载后的重新初始化
+
+

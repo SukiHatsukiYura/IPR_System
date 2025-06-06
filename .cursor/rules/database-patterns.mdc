@@ -1,0 +1,156 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 数据库设计模式和查询规范
+
+## 数据库连接
+使用[database.php](mdc:database.php)中的PDO连接：
+```php
+include_once(__DIR__ . '/database.php');
+// $pdo变量自动可用
+```
+
+## 表设计模式
+参考[sql/patent_management/patent.sql](mdc:sql/patent_management/patent.sql)和[sql/customer_management/customer.sql](mdc:sql/customer_management/customer.sql)：
+
+### 标准字段
+每个表都应包含：
+```sql
+`id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+`created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+`updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+PRIMARY KEY (`id`)
+```
+
+### 外键约束命名
+```sql
+CONSTRAINT `fk_表名_字段名` FOREIGN KEY (`字段名`) REFERENCES `目标表`(`id`)
+```
+
+### 索引命名
+```sql
+KEY `idx_字段名` (`字段名`)
+```
+
+## 常用查询模式
+
+### 基本CRUD操作
+```php
+// 查询单条记录
+$stmt = $pdo->prepare("SELECT * FROM table_name WHERE id = ?");
+$stmt->execute([$id]);
+$record = $stmt->fetch();
+
+// 查询多条记录
+$stmt = $pdo->prepare("SELECT * FROM table_name WHERE status = ? ORDER BY created_at DESC");
+$stmt->execute([$status]);
+$records = $stmt->fetchAll();
+
+// 插入记录
+$stmt = $pdo->prepare("INSERT INTO table_name (field1, field2) VALUES (?, ?)");
+$result = $stmt->execute([$value1, $value2]);
+
+// 更新记录
+$stmt = $pdo->prepare("UPDATE table_name SET field1 = ?, updated_at = NOW() WHERE id = ?");
+$result = $stmt->execute([$new_value, $id]);
+
+// 删除记录
+$stmt = $pdo->prepare("DELETE FROM table_name WHERE id = ?");
+$result = $stmt->execute([$id]);
+```
+
+### 关联查询
+```php
+// 左连接查询
+$sql = "SELECT p.*, c.customer_name_cn 
+        FROM patent_case_info p 
+        LEFT JOIN customer c ON p.client_id = c.id 
+        WHERE p.id = ?";
+$stmt = $pdo->prepare($sql);
+$stmt->execute([$patent_id]);
+```
+
+### 分页查询
+```php
+$page = intval($_GET['p'] ?? 1);
+$page_size = intval($_GET['page_size'] ?? 20);
+$offset = ($page - 1) * $page_size;
+
+// 查询总数
+$count_sql = "SELECT COUNT(*) FROM table_name WHERE condition = ?";
+$count_stmt = $pdo->prepare($count_sql);
+$count_stmt->execute([$condition]);
+$total = $count_stmt->fetchColumn();
+
+// 查询分页数据
+$sql = "SELECT * FROM table_name WHERE condition = ? ORDER BY id DESC LIMIT ? OFFSET ?";
+$stmt = $pdo->prepare($sql);
+$stmt->execute([$condition, $page_size, $offset]);
+$records = $stmt->fetchAll();
+```
+
+## 事务处理
+```php
+try {
+    $pdo->beginTransaction();
+    
+    // 执行多个相关操作
+    $stmt1 = $pdo->prepare("INSERT INTO table1 ...");
+    $stmt1->execute($data1);
+    
+    $stmt2 = $pdo->prepare("UPDATE table2 ...");
+    $stmt2->execute($data2);
+    
+    $pdo->commit();
+    echo json_encode(['success' => true]);
+} catch (Exception $e) {
+    $pdo->rollBack();
+    echo json_encode(['success' => false, 'msg' => $e->getMessage()]);
+}
+```
+
+## 数据验证
+```php
+// 验证必填字段
+$required_fields = ['field1', 'field2'];
+foreach ($required_fields as $field) {
+    if (empty($_POST[$field])) {
+        echo json_encode(['success' => false, 'msg' => "字段{$field}不能为空"]);
+        exit;
+    }
+}
+
+// 验证外键存在性
+$stmt = $pdo->prepare("SELECT id FROM customer WHERE id = ?");
+$stmt->execute([$customer_id]);
+if (!$stmt->fetch()) {
+    echo json_encode(['success' => false, 'msg' => '客户不存在']);
+    exit;
+}
+```
+
+## 特殊字段处理
+### 日期字段
+```php
+// 空日期处理
+$date_value = !empty($_POST['date_field']) ? $_POST['date_field'] : null;
+
+// 日期格式验证
+if ($date_value && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_value)) {
+    echo json_encode(['success' => false, 'msg' => '日期格式错误']);
+    exit;
+}
+```
+
+### 多选字段
+```php
+// 多选值处理（逗号分隔）
+$selected_ids = is_array($_POST['ids']) ? implode(',', $_POST['ids']) : $_POST['ids'];
+
+// 查询时分割
+$ids_array = !empty($record['selected_ids']) ? explode(',', $record['selected_ids']) : [];
+```
+
+

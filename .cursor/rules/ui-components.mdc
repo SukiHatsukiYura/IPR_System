@@ -1,0 +1,115 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# UI组件和样式指南
+
+## 通用组件库
+项目提供了一套完整的UI组件，定义在[common/functions.php](mdc:common/functions.php)和[css/module.css](mdc:css/module.css)中。
+
+### 下拉框组件
+#### 单选下拉框
+```php
+// 使用方法
+render_select_search('field_name', $options_array, $selected_value);
+
+// 示例
+$users_options = [1 => '张三', 2 => '李四'];
+render_select_search('user_id', $users_options, $current_user_id);
+```
+
+#### 多选下拉框
+```php
+// 使用方法
+render_select_search_multi('field_name', $options_array, $selected_values);
+
+// 示例
+$departments = [1 => '技术部', 2 => '市场部'];
+render_select_search_multi('dept_ids', $departments, '1,2');
+```
+
+#### 重要提示
+- 使用下拉框组件前必须调用`render_select_search_assets()`
+- 组件会自动生成隐藏字段和显示字段
+- 支持搜索和键盘导航
+
+### 表格样式
+参考[css/module.css](mdc:css/module.css)中的表格样式：
+
+```html
+<table class="module-table">
+    <colgroup>
+        <col style="width:120px;">
+        <col style="width:200px;">
+    </colgroup>
+    <tr>
+        <td class="module-label module-req">*必填字段</td>
+        <td><input type="text" class="module-input" required></td>
+    </tr>
+</table>
+```
+
+### 按钮样式
+```html
+<!-- 标准按钮 -->
+<button class="btn-mini">普通按钮</button>
+<button class="btn-mini active">激活状态</button>
+
+<!-- 主题按钮 -->
+<button class="btn-theme">主题按钮</button>
+<button class="btn-cancel">取消按钮</button>
+
+<!-- 图标按钮 -->
+<button class="btn-mini icon-save">保存</button>
+<button class="btn-mini icon-edit">编辑</button>
+```
+
+### 模态框
+```html
+<div class="module-modal" style="display:flex;">
+    <div class="module-modal-content">
+        <button class="module-modal-close">&times;</button>
+        <h3 class="module-modal-title">标题</h3>
+        <div class="module-modal-body">
+            <!-- 内容 -->
+        </div>
+        <div class="module-modal-footer">
+            <button class="btn-theme">确定</button>
+            <button class="btn-cancel">取消</button>
+        </div>
+    </div>
+</div>
+```
+
+### 表单输入框
+```html
+<!-- 标准输入框 -->
+<input type="text" class="module-input" placeholder="请输入">
+
+<!-- 文本域 -->
+<textarea class="module-textarea" rows="3"></textarea>
+
+<!-- 只读输入框 -->
+<input type="text" class="module-input" readonly>
+```
+
+## 响应式设计
+- 表格最小宽度：900px
+- 使用`table-layout:fixed`和`colgroup`控制列宽
+- 模态框最大宽度：98vw，最大高度：80vh
+
+## 颜色主题
+- 主题色：#29b6b0（蓝绿色）
+- 错误色：#f44336（红色）
+- 成功色：#388e3c（绿色）
+- 边框色：#e0e0e0（浅灰）
+- 背景色：#f3f6fa（浅蓝灰）
+
+## 间距规范
+- 模块内边距：18px 24px 24px 24px
+- 按钮间距：8px
+- 表格单元格内边距：6px 10px
+- 表单元素间距：10px
+
+

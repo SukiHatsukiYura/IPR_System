@@ -1,11 +1,19 @@
 <?php
 // 数据库配置文件，供全站php引用
 // 兼容php7.1，使用PDO连接MySQL8.0，字符集utf8mb4
+$isLocalorserver = 0; //1为本地，0为服务器
+if ($isLocalorserver == 1) {
+    $DB_HOST = 'localhost';      // 数据库主机
+    $DB_NAME = 'IPR_SYSTEM';  // 数据库名，请替换为实际名称
+    $DB_USER = 'root';      // 数据库用户名，请替换为实际用户名
+    $DB_PASS = 'root';  // 数据库密码，请替换为实际密码
+} else {
+    $DB_HOST = 'localhost';      // 数据库主机
+    $DB_NAME = 'IPR_SYSTEM';  // 数据库名，请替换为实际名称
+    $DB_USER = 'root';      // 数据库用户名，请替换为实际用户名
+    $DB_PASS = 'windowsX999';  // 数据库密码，请替换为实际密码
+}
 
-$DB_HOST = 'localhost';      // 数据库主机
-$DB_NAME = 'IPR_SYSTEM';  // 数据库名，请替换为实际名称
-$DB_USER = 'root';      // 数据库用户名，请替换为实际用户名
-$DB_PASS = 'root';  // 数据库密码，请替换为实际密码
 
 try {
     $pdo = new PDO(

@@ -1,0 +1,47 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 编码规范和约定
+
+## PHP编码规范
+- 使用PHP 7.1语法特性
+- 所有PHP文件以`<?php`开头，不使用短标签
+- 使用PDO进行数据库操作，避免SQL注入
+- 错误处理使用try-catch包装PDO操作
+
+## 安全规范
+- 所有用户输入使用`htmlspecialchars()`转义，项目中定义了简化函数`h()`
+- 数据库查询使用预处理语句
+- 文件包含使用`check_access_via_framework()`验证访问权限
+- 会话管理：所有页面需要`session_start()`和用户登录验证
+
+## 前端规范
+### JavaScript
+- 使用原生JavaScript，不依赖jQuery
+- AJAX请求使用XMLHttpRequest
+- 事件处理使用addEventListener
+- 避免内联JavaScript，将代码放在`<script>`标签中
+
+### CSS类命名
+参考[css/module.css](mdc:css/module.css)中的命名规范：
+- `.module-*` - 模块相关样式
+- `.btn-*` - 按钮样式
+- `.icon-*` - 图标样式
+- 使用连字符分隔单词
+
+## 表单处理规范
+- 表单使用AJAX提交，不使用传统form提交
+- 表单验证在前端和后端都要进行
+- 必填字段使用`.module-req`类标记星号
+- 下拉框使用通用组件`render_select_search()`和`render_select_search_multi()`
+
+## 数据库规范
+- 表名使用下划线分隔
+- 主键统一命名为`id`
+- 时间字段使用`created_at`和`updated_at`
+- 外键约束使用`fk_`前缀命名
+- 索引使用`idx_`前缀命名
+
+

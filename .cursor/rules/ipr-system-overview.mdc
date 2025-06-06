@@ -1,0 +1,41 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# IPR知识产权管理系统 - 项目概览
+
+## 系统架构
+这是一个基于PHP 7.1和MySQL 8.0的知识产权管理系统，主要管理专利、商标、版权等案件。
+
+### 核心文件结构
+- [index.php](mdc:index.php) - 主框架入口，包含导航和选项卡系统
+- [database.php](mdc:database.php) - 数据库连接配置
+- [common/functions.php](mdc:common/functions.php) - 通用函数库，包含下拉框、分页等组件
+
+### 模块组织
+系统采用模块化设计，主要模块包括：
+- `modules/customer_management/` - 客户管理
+- `modules/patent_management/` - 专利管理
+- `modules/trademark_management/` - 商标管理
+- `modules/copyright_management/` - 版权管理
+- `modules/system_management/` - 系统管理
+
+### 样式系统
+- [css/index.css](mdc:css/index.css) - 主框架样式
+- [css/module.css](mdc:css/module.css) - 模块通用样式，包含表格、表单、按钮、模态框等
+
+## 技术规范
+- PHP版本：7.1
+- MySQL版本：8.0
+- 表单提交：使用AJAX，不使用form表单提交
+- 编码：UTF-8
+- 语言：中文简体
+
+## 数据库设计
+数据库表按模块组织在`sql/`目录下：
+- [sql/patent_management/patent.sql](mdc:sql/patent_management/patent.sql) - 专利相关表
+- [sql/customer_management/customer.sql](mdc:sql/customer_management/customer.sql) - 客户相关表
+- [sql/system_management/settings.sql](mdc:sql/system_management/settings.sql) - 系统设置表
+
+

@@ -2,6 +2,53 @@
 // 首页内容，仿照原系统布局
 ?>
 <div class="homepage-panel">
+    <!-- 已开放功能 -->
+    <div class="panel collapsible-panel">
+        <div class="panel-header collapsible-header" data-target="features-content">
+            <span class="collapse-arrow">&#9660;</span>
+            <h3 class="panel-title"><i class="icon-features"></i> 已开放功能</h3>
+        </div>
+        <div class="panel-content collapsible-content" id="features-content">
+            <div class="features-grid">
+                <div class="feature-category">
+                    <h4 class="category-title">系统管理</h4>
+                    <div class="feature-links">
+                        <a href="javascript:void(0)" onclick="openSystemTab('personal_settings', '个人设置')" class="feature-link">
+                            <i class="icon-user"></i>个人设置
+                        </a>
+                        <a href="javascript:void(0)" onclick="openSystemTab('department_settings', '部门设置')" class="feature-link">
+                            <i class="icon-department"></i>部门设置
+                        </a>
+                    </div>
+                </div>
+
+                <div class="feature-category">
+                    <h4 class="category-title">客户管理</h4>
+                    <div class="feature-links">
+                        <a href="javascript:void(0)" onclick="openCustomerTab('customer', '客户管理')" class="feature-link">
+                            <i class="icon-customer"></i>客户
+                        </a>
+                        <a href="javascript:void(0)" onclick="openCustomerTab('agency', '代理机构')" class="feature-link">
+                            <i class="icon-agency"></i>代理机构
+                        </a>
+                    </div>
+                </div>
+
+                <div class="feature-category">
+                    <h4 class="category-title">专利管理</h4>
+                    <div class="feature-links">
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(1, 0, null) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-add"></i>新增专利
+                        </a>
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(1, 5, 0) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-search"></i>专利查询
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 待办事项 -->
     <div class="panel collapsible-panel">
         <div class="panel-header collapsible-header" data-target="todo-content">
@@ -191,4 +238,164 @@
     .blue {
         background: #2196f3;
     }
+
+    /* 已开放功能样式 */
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .feature-category {
+        background: #f9f9f9;
+        border-radius: 6px;
+        padding: 16px;
+        border: 1px solid #e0e0e0;
+    }
+
+    .category-title {
+        margin: 0 0 12px 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #29b6b0;
+        border-bottom: 2px solid #29b6b0;
+        padding-bottom: 6px;
+    }
+
+    .feature-links {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .feature-link {
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        text-decoration: none;
+        color: #333;
+        transition: all 0.2s;
+        font-size: 14px;
+    }
+
+    .feature-link:hover {
+        background: #29b6b0;
+        color: #fff;
+        border-color: #29b6b0;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(41, 182, 176, 0.2);
+    }
+
+    .feature-link i {
+        margin-right: 8px;
+        font-size: 16px;
+        width: 18px;
+        text-align: center;
+    }
+
+    /* 图标样式 */
+    .icon-features::before {
+        content: "🚀";
+    }
+
+    .icon-user::before {
+        content: "👤";
+    }
+
+    .icon-department::before {
+        content: "🏢";
+    }
+
+    .icon-customer::before {
+        content: "👥";
+    }
+
+    .icon-agency::before {
+        content: "🏛️";
+    }
+
+    .icon-add::before {
+        content: "➕";
+    }
+
+    .icon-search::before {
+        content: "🔍";
+    }
+
+    .icon-todo::before {
+        content: "📋";
+    }
+
+    .icon-task::before {
+        content: "⚡";
+    }
+
+    .icon-report::before {
+        content: "📊";
+    }
+
+    .icon-clock::before {
+        content: "⏰";
+    }
 </style>
+
+<script>
+    // 面板折叠功能
+    document.addEventListener('DOMContentLoaded', function() {
+        // 绑定所有可折叠面板的点击事件
+        document.querySelectorAll('.collapsible-header').forEach(function(header) {
+            header.addEventListener('click', function() {
+                var targetId = this.getAttribute('data-target');
+                var content = document.getElementById(targetId);
+                var arrow = this.querySelector('.collapse-arrow');
+
+                if (content.classList.contains('collapsed')) {
+                    // 展开
+                    content.classList.remove('collapsed');
+                    content.style.display = 'block';
+                    arrow.style.transform = 'rotate(0deg)';
+                } else {
+                    // 折叠
+                    content.classList.add('collapsed');
+                    content.style.display = 'none';
+                    arrow.style.transform = 'rotate(-90deg)';
+                }
+            });
+        });
+    });
+
+    // 系统管理跳转函数
+    function openSystemTab(subModule, title) {
+        if (window.parent.openTab) {
+            // 系统管理模块索引为7
+            if (subModule === 'personal_settings') {
+                // 个人设置为索引0
+                window.parent.openTab(7, 0, null);
+            } else if (subModule === 'department_settings') {
+                // 部门设置在系统设置(索引2)下的子项(索引1)
+                window.parent.openTab(7, 2, 1);
+            }
+        } else {
+            alert('框架导航功能不可用');
+        }
+    }
+
+    // 客户管理跳转函数
+    function openCustomerTab(subModule, title) {
+        if (window.parent.openTab) {
+            // 客户管理模块索引为0
+            if (subModule === 'customer') {
+                // 客户为索引1
+                window.parent.openTab(0, 1, null);
+            } else if (subModule === 'agency') {
+                // 代理机构为索引2
+                window.parent.openTab(0, 2, null);
+            }
+        } else {
+            alert('框架导航功能不可用');
+        }
+    }
+</script>
