@@ -164,6 +164,12 @@ if (!isset($_SESSION['user_id'])) {
                         title: '案件管理',
                         icon: '📁',
                         sub: ['商标查询', '商标来文', '流程监控', '文件管理', '期限监控']
+                    },
+                    {
+                        title: '商标编辑',
+                        icon: '✏️',
+                        sub: [],
+                        hidden: true
                     }
                 ]
             },
@@ -179,6 +185,12 @@ if (!isset($_SESSION['user_id'])) {
                         title: '案件管理',
                         icon: '📁',
                         sub: ['版权查询', '文件管理']
+                    },
+                    {
+                        title: '版权编辑',
+                        icon: '✏️',
+                        sub: [],
+                        hidden: true
                     }
                 ]
             },
@@ -287,9 +299,9 @@ if (!isset($_SESSION['user_id'])) {
                 // 专利管理
                 ['add_patent', 'personal_cases', 'case_assignment', 'review_management', 'submission_management', 'case_management', 'edit_patent'],
                 // 商标管理
-                ['add_trademark', 'personal_cases', 'submission_management', 'case_management'],
+                ['add_trademark', 'personal_cases', 'submission_management', 'case_management', 'edit_trademark'],
                 // 版权管理
-                ['add_copyright', 'case_management'],
+                ['add_copyright', 'case_management', 'edit_copyright'],
                 // 发文管理
                 ['outgoing_documents', 'email_management'],
                 // 批量管理
@@ -323,12 +335,14 @@ if (!isset($_SESSION['user_id'])) {
                     ['add_trademark'],
                     ['in_progress', 'completed', 'overdue', 'my_focus', 'department_cases', 'search'],
                     ['pending', 'under_review', 'completed'],
-                    ['trademark_search', 'trademark_incoming', 'process_monitoring', 'file_management', 'deadline_monitoring']
+                    ['trademark_search', 'trademark_incoming', 'process_monitoring', 'file_management', 'deadline_monitoring'],
+                    ['edit_trademark']
                 ],
                 // 版权管理
                 [
                     ['add_copyright'],
-                    ['copyright_search', 'file_management']
+                    ['copyright_search', 'file_management'],
+                    ['edit_copyright']
                 ],
                 // 发文管理
                 [
@@ -362,8 +376,8 @@ if (!isset($_SESSION['user_id'])) {
                 // 这些一级菜单直接在模块目录下
                 if (
                     (moduleDir === 'patent_management' && (menuDir === 'add_patent' || menuDir === 'edit_patent')) ||
-                    (moduleDir === 'trademark_management' && menuDir === 'add_trademark') ||
-                    (moduleDir === 'copyright_management' && menuDir === 'add_copyright')
+                    (moduleDir === 'trademark_management' && (menuDir === 'add_trademark' || menuDir === 'edit_trademark')) ||
+                    (moduleDir === 'copyright_management' && (menuDir === 'add_copyright' || menuDir === 'edit_copyright'))
                 ) {
                     return `modules/${moduleDir}/${fileNames[moduleIndex][menuIndex][0]}.php`;
                 }
@@ -632,6 +646,12 @@ if (!isset($_SESSION['user_id'])) {
                         // 商标管理-案件管理-商标查询
                         // 案件管理在商标管理下的第3个菜单（索引3），商标查询在案件管理下的第0个子菜单
                         openTab(idx, 3, 0);
+                    }
+                    // 新增：如果点击的是"版权管理"，默认进入版权查询页面
+                    if (modules[idx].name === '版权管理') {
+                        // 版权管理-案件管理-版权查询
+                        // 案件管理在版权管理下的第1个菜单（索引1），版权查询在案件管理下的第0个子菜单
+                        openTab(idx, 1, 0);
                     }
                 });
             });

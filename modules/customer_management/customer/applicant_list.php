@@ -649,6 +649,7 @@ function h($v)
                                 '<td>' + (f.created_at ? f.created_at.substr(0, 16) : '') + '</td>' +
                                 '<td>' +
                                 '<a href="' + f.file_path + '" download class="btn-mini" style="margin-right:8px;">下载</a>' +
+                                // 把删除按钮改成a链接
                                 '<button type="button" class="btn-mini file-del" data-id="' + f.id + '" style="color:#f44336;">删除</button>' +
                                 '</td>' +
                                 '</tr>';

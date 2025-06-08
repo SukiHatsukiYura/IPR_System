@@ -8,6 +8,7 @@
             <span class="collapse-arrow">&#9660;</span>
             <h3 class="panel-title"><i class="icon-features"></i> 已开放功能</h3>
         </div>
+        <!-- 改成显示两行，一行3个模块 -->
         <div class="panel-content collapsible-content" id="features-content">
             <div class="features-grid">
                 <div class="feature-category">
@@ -45,6 +46,31 @@
                         </a>
                     </div>
                 </div>
+
+                <div class="feature-category">
+                    <h4 class="category-title">商标管理</h4>
+                    <div class="feature-links">
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(2, 0, null) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-add"></i>新增商标
+                        </a>
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(2, 3, 0) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-search"></i>商标查询
+                        </a>
+                    </div>
+                </div>
+
+                <div class="feature-category">
+                    <h4 class="category-title">版权管理</h4>
+                    <div class="feature-links">
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(3, 0, null) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-add"></i>新增版权
+                        </a>
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(3, 1, 0) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-search"></i>版权查询
+                        </a>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -240,10 +266,12 @@
     }
 
     /* 已开放功能样式 */
+    /* 改成不限制行数，但是一行最多显示3个模块 */
     .features-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        grid-template-columns: repeat(3, 1fr);
         gap: 20px;
+        grid-template-rows: repeat(auto-fill, minmax(100px, 1fr));
     }
 
     .feature-category {

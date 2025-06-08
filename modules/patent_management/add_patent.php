@@ -1,6 +1,7 @@
 <?php
 session_start();
 include_once(__DIR__ . '/../../database.php');
+include_once(__DIR__ . '/../../common/functions.php'); // 引入通用函数库
 check_access_via_framework();
 
 // 检查是否通过框架访问
@@ -41,10 +42,77 @@ $source_countries = ['中国', '美国', '日本', '其他'];
 // 其他选项
 $other_options = ['同步提交', '提前公布', '请求保密审查', '预审案件', '优先审查', '同时请求DAS码', '请求提前公开', '请求费用减缓'];
 
-// 动态数据
+// 查询动态数据
 $departments = $pdo->query("SELECT id, dept_name FROM department WHERE is_active=1 ORDER BY sort_order, id")->fetchAll();
 $users = $pdo->query("SELECT id, real_name FROM user WHERE is_active=1 ORDER BY real_name")->fetchAll();
 $customers = $pdo->query("SELECT id, customer_name_cn FROM customer ORDER BY customer_name_cn")->fetchAll();
+
+// 格式化数据为通用下拉框函数所需格式
+$departments_options = [];
+$users_options = [];
+$customers_options = [];
+$process_items_options = [];
+$business_types_options = [];
+$case_statuses_options = [];
+$application_types_options = [];
+$countries_options = [];
+$case_flows_options = [];
+$start_stages_options = [];
+$client_statuses_options = [];
+$source_countries_options = [];
+$application_modes_options = [];
+
+foreach ($departments as $dept) {
+    $departments_options[$dept['id']] = $dept['dept_name'];
+}
+
+foreach ($users as $user) {
+    $users_options[$user['id']] = $user['real_name'];
+}
+
+foreach ($customers as $customer) {
+    $customers_options[$customer['id']] = $customer['customer_name_cn'];
+}
+
+foreach ($process_items as $item) {
+    $process_items_options[$item] = $item;
+}
+
+foreach ($business_types as $type) {
+    $business_types_options[$type] = $type;
+}
+
+foreach ($case_statuses as $status) {
+    $case_statuses_options[$status] = $status;
+}
+
+foreach ($application_types as $type) {
+    $application_types_options[$type] = $type;
+}
+
+foreach ($countries as $country) {
+    $countries_options[$country] = $country;
+}
+
+foreach ($case_flows as $flow) {
+    $case_flows_options[$flow] = $flow;
+}
+
+foreach ($start_stages as $stage) {
+    $start_stages_options[$stage] = $stage;
+}
+
+foreach ($client_statuses as $status) {
+    $client_statuses_options[$status] = $status;
+}
+
+foreach ($source_countries as $country) {
+    $source_countries_options[$country] = $country;
+}
+
+foreach ($application_modes as $mode) {
+    $application_modes_options[$mode] = $mode;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save') {
     header('Content-Type: application/json');
@@ -140,10 +208,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
     exit;
 }
-function h($v)
-{
-    return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8');
-}
+
 function render_select($name, $options, $val = '', $placeholder = '--请选择--')
 {
     $html = "<select name=\"$name\" class=\"module-input\">";
@@ -155,163 +220,6 @@ function render_select($name, $options, $val = '', $placeholder = '--请选择--
     $html .= "</select>";
     return $html;
 }
-function renderUserSearch($name, $data, $multi = false, $post_val = '')
-{
-    $val = isset($_POST[$name]) ? $_POST[$name] : $post_val;
-    $display = '';
-    // 判断数据类型
-    $is_assoc = false;
-    if (!empty($data) && is_array($data[0])) {
-        $is_assoc = true;
-    }
-    if ($multi) {
-        $selected = $val ? explode(',', $val) : [];
-        $names = [];
-        foreach ($data as $d) {
-            if ($is_assoc) {
-                $id = $d['id'];
-                $label = isset($d['real_name']) ? $d['real_name'] : (isset($d['dept_name']) ? $d['dept_name'] : (isset($d['customer_name_cn']) ? $d['customer_name_cn'] : $id));
-            } else {
-                $id = $d;
-                $label = $d;
-            }
-            if (in_array($id, $selected)) {
-                $names[] = $label;
-            }
-        }
-        $display = implode(',', $names);
-    } else {
-        foreach ($data as $d) {
-            if ($is_assoc) {
-                $id = $d['id'];
-                $label = isset($d['real_name']) ? $d['real_name'] : (isset($d['dept_name']) ? $d['dept_name'] : (isset($d['customer_name_cn']) ? $d['customer_name_cn'] : $id));
-            } else {
-                $id = $d;
-                $label = $d;
-            }
-            if ($id == $val) {
-                $display = $label;
-                break;
-            }
-        }
-    }
-    $class = $multi ? 'module-select-search-multi' : 'module-select-search';
-    $html = '<div class="' . $class . '-box">';
-    $html .= '<input type="text" class="module-input ' . $class . '-input" name="' . $name . '_display" value="' . htmlspecialchars($display) . '" readonly placeholder="点击选择">';
-    $html .= '<input type="hidden" name="' . $name . '" value="' . htmlspecialchars($val) . '">';
-    $html .= '<div class="' . $class . '-list" style="display:none;">';
-    if ($multi) {
-        $html .= '<div class="multi-ops">';
-        $html .= '<button type="button" class="btn-select-all">全选</button>';
-        $html .= '<button type="button" class="btn-clear">清除</button>';
-        $html .= '</div>';
-    }
-    $html .= '<input type="text" class="' . $class . '-list-input" placeholder="搜索">';
-    $html .= '<div class="' . $class . '-list-items"></div>';
-    $html .= '</div>';
-    $html .= '</div>';
-    $script = '<script>
-    (function() {
-        var box = document.querySelector("[name=\'' . $name . '_display\']").closest(".' . $class . '-box"),
-            input = box.querySelector(".' . $class . '-input"),
-            hidden = box.querySelector("input[type=hidden]"),
-            list = box.querySelector(".' . $class . '-list"),
-            searchInput = list.querySelector(".' . $class . '-list-input"),
-            itemsDiv = list.querySelector(".' . $class . '-list-items"),
-            data = ' . json_encode($data) . ',
-            isAssoc = ' . ($is_assoc ? 'true' : 'false') . ',
-            selected = hidden.value ? hidden.value.split(",") : [];
-        function getIdLabel(item) {
-            if (isAssoc) {
-                var id = item.id;
-                var label = item.real_name || item.dept_name || item.customer_name_cn || id;
-                return {id: String(id), label: label};
-            } else {
-                return {id: String(item), label: item};
-            }
-        }
-        function renderList(filter) {
-            var html = "";
-            if (' . ($multi ? 'true' : 'false') . ') {
-                data.forEach(function(item) {
-                    var obj = getIdLabel(item);
-                    if (!filter || obj.label.toLowerCase().indexOf(filter.toLowerCase()) !== -1) {
-                        html += "<div class=\"' . $class . '-item\"><label><input type=\"checkbox\" value=\"" + obj.id + "\"" + 
-                            (selected.indexOf(String(obj.id)) !== -1 ? " checked" : "") + ">" + obj.label + "</label></div>";
-                    }
-                });
-            } else {
-                html += "<div class=\"' . $class . '-item\" data-id=\"\">--请选择--</div>";
-                data.forEach(function(item) {
-                    var obj = getIdLabel(item);
-                    if (!filter || obj.label.toLowerCase().indexOf(filter.toLowerCase()) !== -1) {
-                        html += "<div class=\"' . $class . '-item\" data-id=\"" + obj.id + "\">" + obj.label + "</div>";
-                    }
-                });
-            }
-            if (!html) html = "<div class=\"no-match\">无匹配项</div>";
-            itemsDiv.innerHTML = html;
-        }
-        input.onclick = function() {
-            renderList("");
-            list.style.display = "block";
-            searchInput.value = "";
-            searchInput.focus();
-        };
-        searchInput.oninput = function() {
-            renderList(this.value.trim());
-        };
-        document.addEventListener("click", function(e) {
-            if (!box.contains(e.target)) list.style.display = "none";
-        });
-        if (' . ($multi ? 'true' : 'false') . ') {
-            itemsDiv.onchange = function(e) {
-                if (e.target.type === "checkbox") {
-                    var vals = Array.from(itemsDiv.querySelectorAll("input[type=checkbox]:checked")).map(function(cb) {
-                        return cb.value;
-                    });
-                    selected = vals;
-                    input.value = data.filter(function(u) {
-                        var obj = getIdLabel(u);
-                        return selected.indexOf(String(obj.id)) !== -1;
-                    }).map(function(u) {
-                        return getIdLabel(u).label;
-                    }).join(",");
-                    hidden.value = selected.join(",");
-                }
-            };
-            var btnSelectAll = list.querySelector(".btn-select-all"),
-                btnClear = list.querySelector(".btn-clear");
-            btnSelectAll.onclick = function() {
-                itemsDiv.querySelectorAll("input[type=checkbox]").forEach(function(cb) {
-                    cb.checked = true;
-                });
-                var event = new Event("change");
-                itemsDiv.dispatchEvent(event);
-            };
-            btnClear.onclick = function() {
-                itemsDiv.querySelectorAll("input[type=checkbox]").forEach(function(cb) {
-                    cb.checked = false;
-                });
-                var event = new Event("change");
-                itemsDiv.dispatchEvent(event);
-            };
-        } else {
-            itemsDiv.onmousedown = function(e) {
-                var item = e.target.closest(".' . $class . '-item");
-                if (item) {
-                    input.value = item.textContent === "--请选择--" ? "" : item.textContent;
-                    hidden.value = item.getAttribute("data-id");
-                    list.style.display = "none";
-                }
-            };
-        }
-    })();
-    </script>';
-    return $html . $script;
-}
-
-include_once(__DIR__ . '/../../common/functions.php');
 ?>
 <!DOCTYPE html>
 <html>
@@ -345,7 +253,7 @@ include_once(__DIR__ . '/../../common/functions.php');
                     <td><input type="text" name="case_code" class="module-input" value="系统自动生成" readonly></td>
                     <td class="module-label module-req">*承办部门</td>
                     <td>
-                        <?php echo renderUserSearch('business_dept_id', $departments, false, ''); ?>
+                        <?php render_select_search('business_dept_id', $departments_options, ''); ?>
                     </td>
                     <td class="module-label">开卷日期</td>
                     <td><input type="date" name="open_date" class="module-input" value=""></td>
@@ -361,15 +269,15 @@ include_once(__DIR__ . '/../../common/functions.php');
                 <tr>
                     <td class="module-label module-req">*处理事项</td>
                     <td>
-                        <?php echo renderUserSearch('process_item', $process_items, false, ''); ?>
+                        <?php render_select_search('process_item', $process_items_options, ''); ?>
                     </td>
                     <td class="module-label module-req">*客户名称</td>
                     <td>
-                        <?php echo renderUserSearch('client_id', $customers, false, ''); ?>
+                        <?php render_select_search('client_id', $customers_options, ''); ?>
                     </td>
                     <td class="module-label">业务类型</td>
                     <td>
-                        <?php echo renderUserSearch('business_type', $business_types, false, ''); ?>
+                        <?php render_select_search('business_type', $business_types_options, ''); ?>
                     </td>
                 </tr>
                 <tr>
@@ -395,13 +303,13 @@ include_once(__DIR__ . '/../../common/functions.php');
                 <tr>
                     <td class="module-label">业务人员</td>
                     <td colspan="5">
-                        <?php echo renderUserSearch('business_user_ids', $users, true, ''); ?>
+                        <?php render_select_search_multi('business_user_ids', $users_options, ''); ?>
                     </td>
                 </tr>
                 <tr>
                     <td class="module-label">业务助理</td>
                     <td colspan="5">
-                        <?php echo renderUserSearch('business_assistant_ids', $users, true, ''); ?>
+                        <?php render_select_search_multi('business_assistant_ids', $users_options, ''); ?>
                     </td>
                 </tr>
                 <tr>
@@ -458,7 +366,7 @@ include_once(__DIR__ . '/../../common/functions.php');
                     <td><input type="date" name="publication_date" class="module-input" value=""></td>
                     <td class="module-label">处理人</td>
                     <td>
-                        <?php echo renderUserSearch('handler_id', $users, false, ''); ?>
+                        <?php render_select_search('handler_id', $users_options, ''); ?>
                     </td>
                     <td class="module-label">公告号</td>
                     <td><input type="text" name="announcement_no" class="module-input" value=""></td>

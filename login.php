@@ -51,7 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         body {
             margin: 0;
             padding: 0;
-            background: #f3f6fa;
+            /* 背景色改为绿色渐变，从左往右 */
+            background: linear-gradient(to right,rgb(53, 247, 159),rgb(43, 180, 5));
             font-family: "Microsoft YaHei", Arial, sans-serif;
             min-height: 100vh;
         }

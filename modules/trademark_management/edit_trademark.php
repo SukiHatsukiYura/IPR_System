@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'save_task') {
         // 保存处理事项
-        $patent_id = intval($_POST['patent_case_info_id']);
+        $trademark_id = intval($_POST['trademark_case_info_id']);
         $task_id = intval($_POST['task_id'] ?? 0);
         $current_user_id = $_SESSION['user_id'] ?? 1; // 当前登录用户ID
         $current_date = date('Y-m-d');
@@ -64,16 +64,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $data['task_id'] = $task_id;
                 $set[] = "modifier_id = :modifier_id";
                 $set[] = "modification_date = :modification_date";
-                $sql = "UPDATE patent_case_task SET " . implode(',', $set) . " WHERE id = :task_id";
+                $sql = "UPDATE trademark_case_task SET " . implode(',', $set) . " WHERE id = :task_id";
             } else {
                 // 新增
-                $data['patent_case_info_id'] = $patent_id;
+                $data['trademark_case_info_id'] = $trademark_id;
                 $data['creator_id'] = $current_user_id;
                 $data['creation_date'] = $current_date;
-                $set[] = "patent_case_info_id = :patent_case_info_id";
+                $set[] = "trademark_case_info_id = :trademark_case_info_id";
                 $set[] = "creator_id = :creator_id";
                 $set[] = "creation_date = :creation_date";
-                $sql = "INSERT INTO patent_case_task SET " . implode(',', $set);
+                $sql = "INSERT INTO trademark_case_task SET " . implode(',', $set);
             }
 
             $stmt = $pdo->prepare($sql);
@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // 删除处理事项
         $task_id = intval($_POST['task_id']);
         try {
-            $stmt = $pdo->prepare("DELETE FROM patent_case_task WHERE id = ?");
+            $stmt = $pdo->prepare("DELETE FROM trademark_case_task WHERE id = ?");
             $result = $stmt->execute([$task_id]);
             echo json_encode(['success' => $result, 'msg' => $result ? null : '删除失败']);
         } catch (PDOException $e) {
@@ -110,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        h.real_name as handler_name,
                        eh.real_name as external_handler_name,
                        s.real_name as supervisor_name
-                FROM patent_case_task t
+                FROM trademark_case_task t
                 LEFT JOIN user h ON t.handler_id = h.id
                 LEFT JOIN user eh ON t.external_handler_id = eh.id
                 LEFT JOIN user s ON t.supervisor_id = s.id
@@ -131,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'get_task_list') {
         // 获取处理事项列表（POST方式）
-        $patent_id = intval($_POST['patent_id']);
+        $trademark_id = intval($_POST['trademark_id']);
 
         // 查询处理事项列表
         $tasks_stmt = $pdo->prepare("
@@ -141,16 +141,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                    s.real_name as supervisor_name,
                    c.real_name as creator_name,
                    m.real_name as modifier_name
-            FROM patent_case_task t
+            FROM trademark_case_task t
             LEFT JOIN user h ON t.handler_id = h.id
             LEFT JOIN user eh ON t.external_handler_id = eh.id
             LEFT JOIN user s ON t.supervisor_id = s.id
             LEFT JOIN user c ON t.creator_id = c.id
             LEFT JOIN user m ON t.modifier_id = m.id
-            WHERE t.patent_case_info_id = ?
+            WHERE t.trademark_case_info_id = ?
             ORDER BY t.id ASC
         ");
-        $tasks_stmt->execute([$patent_id]);
+        $tasks_stmt->execute([$trademark_id]);
         $tasks = $tasks_stmt->fetchAll();
 
         // 输出表格行HTML
@@ -184,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // 处理GET请求的get_task_list
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['action'] === 'get_task_list') {
-    $patent_id = intval($_GET['patent_id']);
+    $trademark_id = intval($_GET['trademark_id']);
 
     // 查询处理事项列表
     $tasks_stmt = $pdo->prepare("
@@ -194,16 +194,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
                s.real_name as supervisor_name,
                c.real_name as creator_name,
                m.real_name as modifier_name
-        FROM patent_case_task t
+        FROM trademark_case_task t
         LEFT JOIN user h ON t.handler_id = h.id
         LEFT JOIN user eh ON t.external_handler_id = eh.id
         LEFT JOIN user s ON t.supervisor_id = s.id
         LEFT JOIN user c ON t.creator_id = c.id
         LEFT JOIN user m ON t.modifier_id = m.id
-        WHERE t.patent_case_info_id = ?
+        WHERE t.trademark_case_info_id = ?
         ORDER BY t.id ASC
     ");
-    $tasks_stmt->execute([$patent_id]);
+    $tasks_stmt->execute([$trademark_id]);
     $tasks = $tasks_stmt->fetchAll();
 
     // 输出表格行HTML
@@ -234,26 +234,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
     exit;
 }
 
-// 获取patent_id
-$patent_id = 0;
+// 获取trademark_id
+$trademark_id = 0;
 if (isset($_GET['id']) && intval($_GET['id']) > 0) {
-    $patent_id = intval($_GET['id']);
-} elseif (isset($_SESSION['edit_patent_id']) && intval($_SESSION['edit_patent_id']) > 0) {
-    $patent_id = intval($_SESSION['edit_patent_id']);
-    unset($_SESSION['edit_patent_id']);
+    $trademark_id = intval($_GET['id']);
+} elseif (isset($_SESSION['edit_trademark_id']) && intval($_SESSION['edit_trademark_id']) > 0) {
+    $trademark_id = intval($_SESSION['edit_trademark_id']);
+    unset($_SESSION['edit_trademark_id']);
 }
 
-if ($patent_id <= 0) {
-    echo '<div style="color:#f44336;text-align:center;margin:40px;">未指定要编辑的专利ID</div>';
+if ($trademark_id <= 0) {
+    echo '<div style="color:#f44336;text-align:center;margin:40px;">未指定要编辑的商标ID</div>';
     exit;
 }
 
-// 查询专利信息
-$patent_stmt = $pdo->prepare("SELECT * FROM patent_case_info WHERE id = ?");
-$patent_stmt->execute([$patent_id]);
-$patent = $patent_stmt->fetch();
-if (!$patent) {
-    echo '<div style="color:#f44336;text-align:center;margin:40px;">未找到该专利信息</div>';
+// 查询商标信息
+$trademark_stmt = $pdo->prepare("SELECT * FROM trademark_case_info WHERE id = ?");
+$trademark_stmt->execute([$trademark_id]);
+$trademark = $trademark_stmt->fetch();
+if (!$trademark) {
+    echo '<div style="color:#f44336;text-align:center;margin:40px;">未找到该商标信息</div>';
     exit;
 }
 
@@ -272,26 +272,27 @@ $tasks_stmt = $pdo->prepare("
            s.real_name as supervisor_name,
            c.real_name as creator_name,
            m.real_name as modifier_name
-    FROM patent_case_task t
+    FROM trademark_case_task t
     LEFT JOIN user h ON t.handler_id = h.id
     LEFT JOIN user eh ON t.external_handler_id = eh.id
     LEFT JOIN user s ON t.supervisor_id = s.id
     LEFT JOIN user c ON t.creator_id = c.id
     LEFT JOIN user m ON t.modifier_id = m.id
-    WHERE t.patent_case_info_id = ?
+    WHERE t.trademark_case_info_id = ?
     ORDER BY t.id ASC
 ");
-$tasks_stmt->execute([$patent_id]);
+$tasks_stmt->execute([$trademark_id]);
 $tasks = $tasks_stmt->fetchAll();
+
+function h($v)
+{
+    return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8');
+}
 
 // 定义tab列表
 $tabs = [
-    'basic' => '基本信息',
-    'extend' => '扩展信息',
-    'applicant' => '著录项目',
-    // 'case' => '案件信息',
-    'fee' => '费用信息',
-    'file' => '文件列表',
+    'basic' => '基本信息'
+    // 'file' => '文件列表',
     // 后续可扩展更多tab
 ];
 
@@ -302,13 +303,13 @@ render_select_search_assets();
     <div class="module-btns">
         <button type="button" class="btn-return" onclick="returnToList()"><i class="icon-cancel"></i> 返回列表</button>
     </div>
-    <h3 style="text-align:center;margin-bottom:15px;">编辑专利</h3>
-    <div id="patent-tabs-bar" style="margin-bottom:10px;">
+    <h3 style="text-align:center;margin-bottom:15px;">编辑商标</h3>
+    <div id="trademark-tabs-bar" style="margin-bottom:10px;">
         <?php foreach ($tabs as $key => $label): ?>
             <button type="button" class="btn-mini tab-btn<?= $key === 'basic' ? ' active' : '' ?>" data-tab="<?= $key ?>"><?= $label ?></button>
         <?php endforeach; ?>
     </div>
-    <div id="patent-tab-content" style="min-height:320px;"></div>
+    <div id="trademark-tab-content" style="min-height:320px;"></div>
 
     <!-- 案件处理事项部分 -->
     <div style="margin-top:20px;border-top:2px solid #e0e0e0;padding-top:15px;">
@@ -368,7 +369,6 @@ render_select_search_assets();
 </div>
 
 <!-- 处理事项编辑模态框 -->
-
 <div id="task-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;">
     <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:8px;padding:20px;width:90%;max-width:800px;max-height:90%;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid #eee;padding-bottom:10px;">
@@ -378,7 +378,7 @@ render_select_search_assets();
 
         <form id="task-form">
             <input type="hidden" name="action" value="save_task">
-            <input type="hidden" name="patent_case_info_id" value="<?= $patent_id ?>">
+            <input type="hidden" name="trademark_case_info_id" value="<?= $trademark_id ?>">
             <input type="hidden" name="task_id" id="task-id">
 
             <table class="module-table" style="width:100%;">
@@ -476,13 +476,13 @@ render_select_search_assets();
 
 <script>
     (function() {
-        var patentId = <?= $patent_id ?>;
+        var trademarkId = <?= $trademark_id ?>;
 
         function loadTab(tabName) {
-            var content = document.getElementById('patent-tab-content');
+            var content = document.getElementById('trademark-tab-content');
             content.innerHTML = '<div style="padding:40px;text-align:center;color:#888;">正在加载...</div>';
             var xhr = new XMLHttpRequest();
-            xhr.open('GET', 'modules/patent_management/edit_tabs/' + tabName + '.php?patent_id=' + patentId, true);
+            xhr.open('GET', 'modules/trademark_management/edit_tabs/' + tabName + '.php?trademark_id=' + trademarkId, true);
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
@@ -518,8 +518,8 @@ render_select_search_assets();
                             }
 
                             // 加载完tab内容后，自动绑定事件
-                            if (typeof window.initPatentTabEvents === 'function') {
-                                window.initPatentTabEvents();
+                            if (typeof window.initTrademarkTabEvents === 'function') {
+                                window.initTrademarkTabEvents();
                             }
                         }, 300);
                     } else {
@@ -550,6 +550,31 @@ render_select_search_assets();
         }, 500);
     })();
 
+    // 返回列表功能
+    function returnToList() {
+        if (window.parent && window.parent.openTab && window.parent.closeTab) {
+            // 获取当前tab的ID（商标编辑tab）
+            var currentTabId = getCurrentTabId();
+
+            // 打开商标查询页面（商标管理-案件管理-商标查询）
+            window.parent.openTab(2, 3, 0);
+
+            // 关闭当前的商标编辑tab
+            if (currentTabId) {
+                window.parent.closeTab(currentTabId);
+            }
+        } else {
+            // 如果不在框架中，直接跳转
+            window.location.href = 'modules/trademark_management/case_management/trademark_search.php';
+        }
+    }
+
+    // 获取当前tab的ID
+    function getCurrentTabId() {
+        // 商标编辑tab的ID格式：2_4_null（商标管理-商标编辑-无子菜单）
+        return '2_4_n';
+    }
+
     // 处理事项相关函数
     function openTaskModal(taskId) {
         // 动态设置模态框标题
@@ -564,7 +589,7 @@ render_select_search_assets();
 
         if (taskId) {
             var xhr = new XMLHttpRequest();
-            xhr.open('POST', 'modules/patent_management/edit_patent.php', true);
+            xhr.open('POST', 'modules/trademark_management/edit_trademark.php', true);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
 
             xhr.onreadystatechange = function() {
@@ -586,7 +611,7 @@ render_select_search_assets();
                                 // 填充基本字段
                                 setFieldValue('input[name="task_id"]', task.id);
                                 setFieldValue('input[name="task_item"]', task.task_item);
-                                setFieldValue('select[name="case_stage"]', task.case_stage);
+                                setFieldValue('input[name="case_stage"]', task.case_stage);
                                 setFieldValue('select[name="task_status"]', task.task_status);
                                 setFieldValue('select[name="task_rule_count"]', task.task_rule_count);
                                 setFieldValue('input[name="internal_deadline"]', task.internal_deadline);
@@ -658,7 +683,7 @@ render_select_search_assets();
         if (!confirm('确定要删除这个处理事项吗？')) return;
 
         var xhr = new XMLHttpRequest();
-        xhr.open('POST', 'modules/patent_management/edit_patent.php', true);
+        xhr.open('POST', 'modules/trademark_management/edit_trademark.php', true);
         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4 && xhr.status === 200) {
@@ -684,7 +709,7 @@ render_select_search_assets();
         var formData = new FormData(this);
 
         var xhr = new XMLHttpRequest();
-        xhr.open('POST', 'modules/patent_management/edit_patent.php', true);
+        xhr.open('POST', 'modules/trademark_management/edit_trademark.php', true);
 
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
@@ -717,7 +742,7 @@ render_select_search_assets();
     // 加载任务列表
     function loadTaskList() {
         var xhr = new XMLHttpRequest();
-        xhr.open('POST', 'modules/patent_management/edit_patent.php', true);
+        xhr.open('POST', 'modules/trademark_management/edit_trademark.php', true);
         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
 
         xhr.onreadystatechange = function() {
@@ -734,31 +759,6 @@ render_select_search_assets();
             alert('加载任务列表失败，网络请求失败');
         };
 
-        xhr.send('action=get_task_list&patent_id=<?php echo $patent_id; ?>');
-    }
-
-    // 返回列表功能
-    function returnToList() {
-        if (window.parent && window.parent.openTab && window.parent.closeTab) {
-            // 获取当前tab的ID（专利编辑tab）
-            var currentTabId = getCurrentTabId();
-
-            // 打开专利查询页面（专利管理-案件管理-专利查询）
-            window.parent.openTab(1, 5, 0);
-
-            // 关闭当前的专利编辑tab
-            if (currentTabId) {
-                window.parent.closeTab(currentTabId);
-            }
-        } else {
-            // 如果不在框架中，直接跳转
-            window.location.href = 'modules/patent_management/case_management/patent_search.php';
-        }
-    }
-
-    // 获取当前tab的ID
-    function getCurrentTabId() {
-        // 专利编辑tab的ID格式：1_6_null（专利管理-专利编辑-无子菜单）
-        return '1_6_n';
+        xhr.send('action=get_task_list&trademark_id=<?php echo $trademark_id; ?>');
     }
 </script>
