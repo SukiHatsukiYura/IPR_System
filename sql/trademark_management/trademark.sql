@@ -114,3 +114,221 @@ CREATE TABLE `trademark_case_task` (
     CONSTRAINT `fk_trademark_task_creator` FOREIGN KEY (`creator_id`) REFERENCES `user`(`id`) ON DELETE SET NULL,
     CONSTRAINT `fk_trademark_task_modifier` FOREIGN KEY (`modifier_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '商标案件处理事项表';
+
+-- 商标案件扩展信息表
+CREATE TABLE `trademark_case_extend_info` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `trademark_case_info_id` INT(11) NOT NULL COMMENT '关联商标案件主表ID',    
+    -- 商标特征信息
+    `is_3d_mark` TINYINT(1) DEFAULT 0 COMMENT '是否三维标志 0否 1是',
+    `color_form` VARCHAR(100) DEFAULT NULL COMMENT '颜色形式',
+    `specified_color` VARCHAR(200) DEFAULT NULL COMMENT '指定颜色',
+    `sound_file_path` VARCHAR(300) DEFAULT NULL COMMENT '声音文件路径',
+    `case_nature` VARCHAR(100) DEFAULT NULL COMMENT '案件性质',
+    `trademark_form_type` VARCHAR(100) DEFAULT NULL COMMENT '商标形式类型',
+    -- 案源信息
+    `second_source_person` VARCHAR(100) DEFAULT NULL COMMENT '第二案源人',
+    `external_source_person` VARCHAR(100) DEFAULT NULL COMMENT '外部案源人',
+    `internal_source_person` VARCHAR(100) DEFAULT NULL COMMENT '内部案源人',
+    -- 疑难信息
+    `difficulty_type` VARCHAR(100) DEFAULT NULL COMMENT '疑难类型',
+    `difficulty_description` TEXT COMMENT '疑难说明',
+    `opponent_name` VARCHAR(200) DEFAULT NULL COMMENT '对方当事人名称',
+    `supplementary_reason` TEXT COMMENT '补充理由',
+    -- 财务信息
+    `cost` DECIMAL(12, 2) DEFAULT NULL COMMENT '成本',
+    `budget` DECIMAL(12, 2) DEFAULT NULL COMMENT '预算',
+    -- 马德里相关信息
+    `madrid_application_language` VARCHAR(50) DEFAULT NULL COMMENT '马德里申请语言',
+    `madrid_application_no` VARCHAR(100) DEFAULT NULL COMMENT '马德里申请号',
+    `madrid_application_date` DATE DEFAULT NULL COMMENT '马德里申请日',
+    `madrid_registration_no` VARCHAR(100) DEFAULT NULL COMMENT '马德里注册号',
+    `madrid_registration_date` DATE DEFAULT NULL COMMENT '马德里注册日',
+    -- 其他信息
+    `is_famous_trademark` TINYINT(1) DEFAULT 0 COMMENT '是否认定驰名商标 0否 1是',
+    -- 系统字段
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_trademark_case_info_id` (`trademark_case_info_id`),
+    CONSTRAINT `fk_trademark_extend_case` FOREIGN KEY (`trademark_case_info_id`) REFERENCES `trademark_case_info`(`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '商标案件扩展信息表';
+
+
+-- 商标案件申请人关联表
+CREATE TABLE `trademark_case_applicant` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `trademark_case_info_id` INT(11) NOT NULL COMMENT '关联商标案件ID',
+    -- 基本信息
+    `case_type` VARCHAR(50) DEFAULT NULL COMMENT '案件类型（专利/商标/版权，逗号分隔）',
+    `applicant_type` VARCHAR(20) DEFAULT NULL COMMENT '申请人类型（个人/单位/其他）',
+    `entity_type` VARCHAR(20) DEFAULT NULL COMMENT '实体类型（大实体/小实体/微实体）',
+    `name_cn` VARCHAR(100) DEFAULT NULL COMMENT '名称(中文)',
+    `name_en` VARCHAR(100) DEFAULT NULL COMMENT '名称(英文)',
+    `name_xing_cn` VARCHAR(50) DEFAULT NULL COMMENT '名称/姓(中文)',
+    `name_xing_en` VARCHAR(50) DEFAULT NULL COMMENT '名称/姓(英文)',
+    `is_first_contact` TINYINT(1) DEFAULT 0 COMMENT '是否第一联系人（0否1是）',
+    `is_receipt_title` TINYINT(1) DEFAULT 0 COMMENT '作为收据抬头（0否1是）',
+    `receipt_title` VARCHAR(100) DEFAULT NULL COMMENT '申请人收据抬头（勾选作为收据抬头时填写）',
+    `credit_code` VARCHAR(50) DEFAULT NULL COMMENT '申请人统一社会信用代码（勾选作为收据抬头时填写）',
+    -- 其它字段
+    `contact_person` VARCHAR(50) DEFAULT NULL COMMENT '联系人',
+    `phone` VARCHAR(30) DEFAULT NULL COMMENT '电话',
+    `email` VARCHAR(100) DEFAULT NULL COMMENT '邮件',
+    `province` VARCHAR(50) DEFAULT NULL COMMENT '省份',
+    `city_cn` VARCHAR(50) DEFAULT NULL COMMENT '城市(中文)',
+    `city_en` VARCHAR(50) DEFAULT NULL COMMENT '城市(英文)',
+    `district` VARCHAR(50) DEFAULT NULL COMMENT '行政区划',
+    `postcode` VARCHAR(20) DEFAULT NULL COMMENT '邮编',
+    `address_cn` VARCHAR(200) DEFAULT NULL COMMENT '街道地址(中文)',
+    `address_en` VARCHAR(200) DEFAULT NULL COMMENT '街道地址(英文)',
+    `department_cn` VARCHAR(100) DEFAULT NULL COMMENT '部门/楼层(中文)',
+    `department_en` VARCHAR(100) DEFAULT NULL COMMENT '部门/楼层(英文)',
+    `id_type` VARCHAR(50) DEFAULT NULL COMMENT '证件类型',
+    `id_number` VARCHAR(100) DEFAULT NULL COMMENT '证件号',
+    `is_fee_reduction` TINYINT(1) DEFAULT 0 COMMENT '费用减案（0否1是）',
+    `fee_reduction_start` DATE DEFAULT NULL COMMENT '费用减案有效期起',
+    `fee_reduction_end` DATE DEFAULT NULL COMMENT '费用减案有效期止',
+    `fee_reduction_code` VARCHAR(100) DEFAULT NULL COMMENT '备案证件号',
+    `cn_agent_code` VARCHAR(100) DEFAULT NULL COMMENT '中国总委托编号',
+    `pct_agent_code` VARCHAR(100) DEFAULT NULL COMMENT 'PCT总委托编号',
+    `is_fee_monitor` TINYINT(1) DEFAULT 0 COMMENT '监控年费（0否1是）',
+    `country` VARCHAR(100) DEFAULT NULL COMMENT '国家(地区)',
+    `nationality` VARCHAR(100) DEFAULT NULL COMMENT '国籍',
+    `business_license` VARCHAR(200) DEFAULT NULL COMMENT '营业执照（文件路径）',
+    `remark` TEXT COMMENT '备注',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_trademark_case_info_id` (`trademark_case_info_id`),
+    CONSTRAINT `fk_trademark_applicant_case` FOREIGN KEY (`trademark_case_info_id`) REFERENCES `trademark_case_info`(`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '商标案件申请人关联表';
+
+-- 商标案件申请人相关上传文件表
+CREATE TABLE `trademark_case_applicant_file` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `trademark_case_applicant_id` INT(11) NOT NULL COMMENT '关联商标案件申请人ID',
+    `trademark_case_info_id` INT(11) NOT NULL COMMENT '关联商标案件ID',
+    `file_type` VARCHAR(50) NOT NULL COMMENT '文件类型（费减证明/总委托书/附件）',
+    `file_name` VARCHAR(200) NOT NULL COMMENT '文件名',
+    `file_path` VARCHAR(300) NOT NULL COMMENT '文件存储路径',
+    `file_size` BIGINT DEFAULT NULL COMMENT '文件大小（字节）',
+    `mime_type` VARCHAR(100) DEFAULT NULL COMMENT '文件MIME类型',
+    `upload_user_id` INT(11) DEFAULT NULL COMMENT '上传人ID，关联user表',
+    `official_issue_date` DATE DEFAULT NULL COMMENT '官方发文日（可选）',
+    `remarks` TEXT COMMENT '备注说明',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_trademark_case_applicant_id` (`trademark_case_applicant_id`),
+    KEY `idx_trademark_case_info_id` (`trademark_case_info_id`),
+    KEY `idx_upload_user_id` (`upload_user_id`),
+    CONSTRAINT `fk_trademark_applicant_file_applicant` FOREIGN KEY (`trademark_case_applicant_id`) REFERENCES `trademark_case_applicant`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_trademark_applicant_file_case` FOREIGN KEY (`trademark_case_info_id`) REFERENCES `trademark_case_info`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_trademark_applicant_file_user` FOREIGN KEY (`upload_user_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '商标案件申请人相关上传文件表';
+
+-- 商标案件代理机构关联表
+CREATE TABLE `trademark_case_agency` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `trademark_case_info_id` INT(11) NOT NULL COMMENT '关联商标案件ID',
+    `agency_id` INT(11) NOT NULL COMMENT '关联代理机构ID',
+    `agency_agent_id` INT(11) DEFAULT NULL COMMENT '关联代理人ID',
+    `agency_contact_id` INT(11) DEFAULT NULL COMMENT '关联联系人ID',
+    `agency_name_cn` VARCHAR(200) DEFAULT NULL COMMENT '代理机构名称(中文)',
+    `agency_code` VARCHAR(100) DEFAULT NULL COMMENT '代理机构代码',
+    `agent_name_cn` VARCHAR(50) DEFAULT NULL COMMENT '代理人姓名(中文)',
+    `agent_license_no` VARCHAR(50) DEFAULT NULL COMMENT '代理人执业证号',
+    `contact_name` VARCHAR(50) DEFAULT NULL COMMENT '联系人姓名',
+    `contact_phone` VARCHAR(30) DEFAULT NULL COMMENT '联系人电话',
+    `contact_email` VARCHAR(100) DEFAULT NULL COMMENT '联系人邮箱',
+    `remark` TEXT COMMENT '备注',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_trademark_case_info_id` (`trademark_case_info_id`),
+    KEY `idx_agency_id` (`agency_id`),
+    KEY `idx_agency_agent_id` (`agency_agent_id`),
+    KEY `idx_agency_contact_id` (`agency_contact_id`),
+    CONSTRAINT `fk_trademark_case_agency_case` FOREIGN KEY (`trademark_case_info_id`) REFERENCES `trademark_case_info`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_trademark_case_agency_agency` FOREIGN KEY (`agency_id`) REFERENCES `agency`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_trademark_case_agency_agent` FOREIGN KEY (`agency_agent_id`) REFERENCES `agency_agent`(`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_trademark_case_agency_contact` FOREIGN KEY (`agency_contact_id`) REFERENCES `agency_contact`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商标案件代理机构关联表';
+
+-- 商标案件官费表
+CREATE TABLE `trademark_case_official_fee` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `trademark_case_info_id` INT(11) NOT NULL COMMENT '关联商标案件ID',
+    `sequence_no` INT(11) DEFAULT NULL COMMENT '序号',
+    `fee_name` VARCHAR(200) NOT NULL COMMENT '费用名称',
+    `fee_reduction_type` ENUM('基础费用', '单位费减', '个人费减') DEFAULT '基础费用' COMMENT '费减类型',
+    `currency` VARCHAR(10) DEFAULT 'CNY' COMMENT '币别',
+    `amount` DECIMAL(12, 2) DEFAULT NULL COMMENT '金额',
+    `quantity` INT(11) DEFAULT 1 COMMENT '数量',
+    `actual_currency` VARCHAR(10) DEFAULT 'CNY' COMMENT '实际币别',
+    `actual_amount` DECIMAL(12, 2) DEFAULT NULL COMMENT '实际金额',
+    `receivable_date` DATE DEFAULT NULL COMMENT '应收日期',
+    `received_date` DATE DEFAULT NULL COMMENT '实收日期',
+    `official_deadline` DATE DEFAULT NULL COMMENT '官方期限',
+    `paid_date` DATE DEFAULT NULL COMMENT '实付日期',
+    `task_item` VARCHAR(100) DEFAULT NULL COMMENT '处理事项',
+    `is_verified` TINYINT(1) DEFAULT 0 COMMENT '是否核查(1是0否)',
+    `remarks` TEXT COMMENT '备注',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_trademark_case_info_id` (`trademark_case_info_id`),
+    KEY `idx_fee_name` (`fee_name`),
+    KEY `idx_receivable_date` (`receivable_date`),
+    KEY `idx_official_deadline` (`official_deadline`),
+    KEY `idx_task_item` (`task_item`),
+    CONSTRAINT `fk_trademark_official_fee_case` FOREIGN KEY (`trademark_case_info_id`) REFERENCES `trademark_case_info`(`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '商标案件官费表';
+
+-- 商标案件文件表
+CREATE TABLE `trademark_case_file` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `trademark_case_info_id` INT(11) NOT NULL COMMENT '关联商标案件ID',
+    `file_type` VARCHAR(50) NOT NULL COMMENT '文件类型（申请书/商标图样/使用证据/审查意见/答复意见/其他）',
+    `file_name` VARCHAR(200) NOT NULL COMMENT '文件名',
+    `file_path` VARCHAR(300) NOT NULL COMMENT '文件存储路径',
+    `file_size` BIGINT DEFAULT NULL COMMENT '文件大小（字节）',
+    `mime_type` VARCHAR(100) DEFAULT NULL COMMENT '文件MIME类型',
+    `upload_user_id` INT(11) DEFAULT NULL COMMENT '上传人ID，关联user表',
+    `official_issue_date` DATE DEFAULT NULL COMMENT '官方发文日（可选）',
+    `remarks` TEXT COMMENT '备注说明',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_trademark_case_info_id` (`trademark_case_info_id`),
+    KEY `idx_file_type` (`file_type`),
+    KEY `idx_upload_user_id` (`upload_user_id`),
+    CONSTRAINT `fk_trademark_case_file_case` FOREIGN KEY (`trademark_case_info_id`) REFERENCES `trademark_case_info`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_trademark_case_file_user` FOREIGN KEY (`upload_user_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '商标案件文件表';
+
+-- 处理事项附件表
+CREATE TABLE `trademark_task_attachment` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `task_id` INT(11) NOT NULL COMMENT '关联处理事项ID',
+    `trademark_case_info_id` INT(11) NOT NULL COMMENT '关联商标案件ID',
+    `file_type` VARCHAR(50) NOT NULL COMMENT '文件类型（申请书/商标图样/使用证据/审查意见/答复意见/其他）',
+    `file_name` VARCHAR(200) NOT NULL COMMENT '文件名',
+    `file_path` VARCHAR(300) NOT NULL COMMENT '文件存储路径',
+    `file_size` BIGINT DEFAULT NULL COMMENT '文件大小（字节）',
+    `mime_type` VARCHAR(100) DEFAULT NULL COMMENT '文件MIME类型',
+    `upload_user_id` INT(11) DEFAULT NULL COMMENT '上传人ID，关联user表',
+    `official_issue_date` DATE DEFAULT NULL COMMENT '官方发文日（可选）',
+    `remarks` TEXT COMMENT '备注说明',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_task_id` (`task_id`),
+    KEY `idx_trademark_case_info_id` (`trademark_case_info_id`),
+    KEY `idx_upload_user_id` (`upload_user_id`),
+    CONSTRAINT `fk_trademark_attachment_task` FOREIGN KEY (`task_id`) REFERENCES `trademark_case_task`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_trademark_attachment_case` FOREIGN KEY (`trademark_case_info_id`) REFERENCES `trademark_case_info`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_trademark_attachment_upload_user` FOREIGN KEY (`upload_user_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '商标处理事项附件表';
+

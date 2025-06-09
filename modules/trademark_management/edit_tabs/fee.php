@@ -1,5 +1,5 @@
 <?php
-// 专利编辑-费用信息
+// 商标编辑-费用信息
 include_once(__DIR__ . '/../../../database.php');
 include_once(__DIR__ . '/../../../common/functions.php');
 check_access_via_framework();
@@ -16,18 +16,18 @@ if (!isset($_SESSION['user_id'])) {
     }
 }
 
-if (!isset($_GET['patent_id']) || intval($_GET['patent_id']) <= 0) {
-    echo '<div class="module-error">未指定专利ID</div>';
+if (!isset($_GET['trademark_id']) || intval($_GET['trademark_id']) <= 0) {
+    echo '<div class="module-error">未指定商标ID</div>';
     exit;
 }
-$patent_id = intval($_GET['patent_id']);
+$trademark_id = intval($_GET['trademark_id']);
 
-// 验证专利是否存在
-$patent_stmt = $pdo->prepare("SELECT id, case_name, process_item FROM patent_case_info WHERE id = ?");
-$patent_stmt->execute([$patent_id]);
-$patent_info = $patent_stmt->fetch();
-if (!$patent_info) {
-    echo '<div class="module-error">未找到该专利信息</div>';
+// 验证商标是否存在
+$trademark_stmt = $pdo->prepare("SELECT id, case_name, process_item FROM trademark_case_info WHERE id = ?");
+$trademark_stmt->execute([$trademark_id]);
+$trademark_info = $trademark_stmt->fetch();
+if (!$trademark_info) {
+    echo '<div class="module-error">未找到该商标信息</div>';
     exit;
 }
 
@@ -131,8 +131,8 @@ function h($v)
 
 <script>
     (function() {
-        var patentId = <?= $patent_id ?>;
-        var API_URL = 'modules/patent_management/edit_tabs/fee_api.php?patent_id=' + patentId;
+        var trademarkId = <?= $trademark_id ?>;
+        var API_URL = 'modules/trademark_management/edit_tabs/fee_api.php?trademark_id=' + trademarkId;
 
         // 通用AJAX请求函数
         function makeRequest(action, data, callback, errorMsg) {
@@ -290,27 +290,28 @@ function h($v)
 
                     // 只收集已勾选费用的数据
                     if (checkbox && checkbox.checked) {
-                        var feeData = {};
+                        // 安全获取元素值的函数
+                        function getElementValue(selector, defaultValue) {
+                            var element = row.querySelector(selector);
+                            return element ? element.value : (defaultValue || '');
+                        }
 
-                        // 安全获取各个字段的值
-                        var feeReductionTypeEl = row.querySelector('.fee-reduction-type-cell');
-                        if (feeReductionTypeEl) feeData.fee_reduction_type = feeReductionTypeEl.value;
+                        // 安全获取元素属性值的函数
+                        function getElementDataValue(selector, attribute, defaultValue) {
+                            var element = row.querySelector(selector);
+                            return element ? element.getAttribute(attribute) : (defaultValue || '');
+                        }
 
-                        var quantityEl = row.querySelector('.fee-quantity-cell');
-                        if (quantityEl) feeData.quantity = parseInt(quantityEl.value) || 1;
-
-                        var actualCurrencyEl = row.querySelector('.fee-actual-currency-cell');
-                        if (actualCurrencyEl) feeData.actual_currency = actualCurrencyEl.value;
-
-                        var actualAmountEl = row.querySelector('.fee-actual-amount-cell');
-                        if (actualAmountEl) feeData.actual_amount = parseFloat(actualAmountEl.value) || 0;
-
-                        var receivableDateEl = row.querySelector('.fee-receivable-date-cell');
-                        if (receivableDateEl) feeData.receivable_date = receivableDateEl.value;
-
-                        var receivedDateEl = row.querySelector('.fee-received-date-cell');
-                        if (receivedDateEl) feeData.received_date = receivedDateEl.value;
-
+                        var feeData = {
+                            fee_reduction_type: getElementValue('.fee-reduction-type-cell'),
+                            currency: getElementDataValue('.fee-currency-cell', 'data-currency'),
+                            amount: parseFloat(getElementDataValue('.fee-amount-cell', 'data-amount', '0')) || 0,
+                            quantity: parseInt(getElementValue('.fee-quantity-cell', '1')) || 1,
+                            actual_currency: getElementValue('.fee-actual-currency-cell'),
+                            actual_amount: parseFloat(getElementValue('.fee-actual-amount-cell', '0')) || 0,
+                            receivable_date: getElementValue('.fee-receivable-date-cell'),
+                            received_date: getElementValue('.fee-received-date-cell')
+                        };
                         updatedFeesData[templateId] = feeData;
                     }
                 });
@@ -357,6 +358,11 @@ function h($v)
 
         // 初始化费用管理模块
         FeeManager.init();
+
+        // 暴露给外部调用的初始化函数
+        window.initTrademarkFeeTab = function() {
+            FeeManager.init();
+        };
     })();
 </script>
 </rewritten_file>

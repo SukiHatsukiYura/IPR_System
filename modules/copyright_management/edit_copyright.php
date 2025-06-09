@@ -291,7 +291,10 @@ function h($v)
 
 // 定义tab列表
 $tabs = [
-    'basic' => '基本信息'
+    'basic' => '基本信息',
+    'applicant'=>'著录项目',
+    'fee'=>'费用信息',
+    'file'=>'文件列表'
     // 后续可扩展更多tab
 ];
 

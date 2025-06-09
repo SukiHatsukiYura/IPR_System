@@ -1,5 +1,5 @@
 <?php
-// 专利编辑-费用信息
+// 版权编辑-费用信息
 include_once(__DIR__ . '/../../../database.php');
 include_once(__DIR__ . '/../../../common/functions.php');
 check_access_via_framework();
@@ -16,18 +16,18 @@ if (!isset($_SESSION['user_id'])) {
     }
 }
 
-if (!isset($_GET['patent_id']) || intval($_GET['patent_id']) <= 0) {
-    echo '<div class="module-error">未指定专利ID</div>';
+if (!isset($_GET['copyright_id']) || intval($_GET['copyright_id']) <= 0) {
+    echo '<div class="module-error">未指定版权ID</div>';
     exit;
 }
-$patent_id = intval($_GET['patent_id']);
+$copyright_id = intval($_GET['copyright_id']);
 
-// 验证专利是否存在
-$patent_stmt = $pdo->prepare("SELECT id, case_name, process_item FROM patent_case_info WHERE id = ?");
-$patent_stmt->execute([$patent_id]);
-$patent_info = $patent_stmt->fetch();
-if (!$patent_info) {
-    echo '<div class="module-error">未找到该专利信息</div>';
+// 验证版权是否存在
+$copyright_stmt = $pdo->prepare("SELECT id, case_name, process_item FROM copyright_case_info WHERE id = ?");
+$copyright_stmt->execute([$copyright_id]);
+$copyright_info = $copyright_stmt->fetch();
+if (!$copyright_info) {
+    echo '<div class="module-error">未找到该版权信息</div>';
     exit;
 }
 
@@ -131,8 +131,8 @@ function h($v)
 
 <script>
     (function() {
-        var patentId = <?= $patent_id ?>;
-        var API_URL = 'modules/patent_management/edit_tabs/fee_api.php?patent_id=' + patentId;
+        var copyrightId = <?= $copyright_id ?>;
+        var API_URL = 'modules/copyright_management/edit_tabs/fee_api.php?copyright_id=' + copyrightId;
 
         // 通用AJAX请求函数
         function makeRequest(action, data, callback, errorMsg) {
@@ -292,24 +292,20 @@ function h($v)
                     if (checkbox && checkbox.checked) {
                         var feeData = {};
 
-                        // 安全获取各个字段的值
+                        // 安全获取元素值
                         var feeReductionTypeEl = row.querySelector('.fee-reduction-type-cell');
+                        var feeQuantityEl = row.querySelector('.fee-quantity-cell');
+                        var feeActualCurrencyEl = row.querySelector('.fee-actual-currency-cell');
+                        var feeActualAmountEl = row.querySelector('.fee-actual-amount-cell');
+                        var feeReceivableDateEl = row.querySelector('.fee-receivable-date-cell');
+                        var feeReceivedDateEl = row.querySelector('.fee-received-date-cell');
+
                         if (feeReductionTypeEl) feeData.fee_reduction_type = feeReductionTypeEl.value;
-
-                        var quantityEl = row.querySelector('.fee-quantity-cell');
-                        if (quantityEl) feeData.quantity = parseInt(quantityEl.value) || 1;
-
-                        var actualCurrencyEl = row.querySelector('.fee-actual-currency-cell');
-                        if (actualCurrencyEl) feeData.actual_currency = actualCurrencyEl.value;
-
-                        var actualAmountEl = row.querySelector('.fee-actual-amount-cell');
-                        if (actualAmountEl) feeData.actual_amount = parseFloat(actualAmountEl.value) || 0;
-
-                        var receivableDateEl = row.querySelector('.fee-receivable-date-cell');
-                        if (receivableDateEl) feeData.receivable_date = receivableDateEl.value;
-
-                        var receivedDateEl = row.querySelector('.fee-received-date-cell');
-                        if (receivedDateEl) feeData.received_date = receivedDateEl.value;
+                        if (feeQuantityEl) feeData.quantity = parseInt(feeQuantityEl.value) || 1;
+                        if (feeActualCurrencyEl) feeData.actual_currency = feeActualCurrencyEl.value;
+                        if (feeActualAmountEl) feeData.actual_amount = parseFloat(feeActualAmountEl.value) || 0;
+                        if (feeReceivableDateEl) feeData.receivable_date = feeReceivableDateEl.value;
+                        if (feeReceivedDateEl) feeData.received_date = feeReceivedDateEl.value;
 
                         updatedFeesData[templateId] = feeData;
                     }

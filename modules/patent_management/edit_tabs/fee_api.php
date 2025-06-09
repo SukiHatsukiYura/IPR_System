@@ -135,7 +135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if (empty($official_fees)) {
                 $html = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">未找到匹配的费用</td></tr>';
             } else {
-                foreach ($official_fees as $index => $fee) {
+                $sequence_no = 1; // 使用独立的序号计数器
+                foreach ($official_fees as $fee) {
                     // 检查该费用是否已添加，如果已添加则使用数据库中的数据
                     $is_checked = isset($existing_fees_map[$fee['fee_name']]) ? 'checked' : '';
                     $display_data = $fee; // 默认使用模板数据
@@ -161,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
                     $html .= '<tr data-template-id="' . $fee['id'] . '">' .
                         '<td style="text-align:center;"><input type="checkbox" class="fee-checkbox" value="' . $fee['id'] . '" ' . $is_checked . '></td>' .
-                        '<td style="text-align:center;">' . ($index + 1) . '</td>' .
+                        '<td style="text-align:center;">' . $sequence_no . '</td>' .
                         '<td class="fee-name-cell">' . htmlspecialchars($fee['fee_name']) . '</td>' .
                         '<td><select class="fee-reduction-type-cell" style="width:80px;">' . $fee_reduction_options . '</select></td>' .
                         '<td style="text-align:center;">' . $display_data['currency'] . '</td>' .
@@ -172,6 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         '<td><input type="date" class="fee-receivable-date-cell" value="' . ($display_data['receivable_date'] ?? '') . '" style="width:100px;"></td>' .
                         '<td><input type="date" class="fee-received-date-cell" value="' . ($display_data['received_date'] ?? '') . '" style="width:100px;"></td>' .
                         '</tr>';
+                    $sequence_no++; // 递增序号
                 }
             }
 
