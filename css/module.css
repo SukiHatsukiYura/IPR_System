@@ -141,7 +141,7 @@
 .module-form.editing .module-input:not([readonly]):not(:disabled),
 .module-form.editing .module-textarea:not([readonly]) {
     background: #fff; /* 白色背景 */
-    border: 1px solid #29b6b0; /* 蓝绿色边框 */
+    /* border: 1px solid #29b6b0; 蓝绿色边框 */
 }
 
 .module-textarea {

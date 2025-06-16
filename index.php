@@ -61,7 +61,7 @@ if (!isset($_SESSION['user_id'])) {
 
     <!-- 底部版权信息 -->
     <div class="footer">
-        Copyright© 2025 广州市鸿鼎知识产权信息有限公司
+        Copyright© 2025 广州市鸿鼎知识产权信息有限公司 V1.1.0
         <!-- | <a href="#">选文常用文档</a> | <a href="#">快速开始</a> | <a href="#">工单提交</a> | <a href="#">更新日志</a> -->
     </div>
 
@@ -98,6 +98,12 @@ if (!isset($_SESSION['user_id'])) {
                         sub: [
                             '新建合同', '草稿', '待处理', '已完成', '合同列表'
                         ]
+                    },
+                    {
+                        title: '合同编辑',
+                        icon: '✏️',
+                        sub: [],
+                        hidden: true
                     }
                 ]
             },
@@ -295,7 +301,7 @@ if (!isset($_SESSION['user_id'])) {
             // 各模块下一级菜单英文目录
             const menuDirs = [
                 // 客户管理
-                ['crm', 'customer', 'agency', 'contract_management'],
+                ['crm', 'customer', 'agency', 'contract_management', 'edit_contract'],
                 // 专利管理
                 ['add_patent', 'personal_cases', 'case_assignment', 'review_management', 'submission_management', 'case_management', 'edit_patent'],
                 // 商标管理
@@ -318,7 +324,8 @@ if (!isset($_SESSION['user_id'])) {
                     ['leads', 'leads_pool', 'customers', 'contracts', 'customer_pool', 'follow_up_records'],
                     ['add_customer', 'customer_list', 'applicant_list', 'inventor_list', 'contact_records'],
                     ['add_agency', 'agency_list'],
-                    ['create_contract', 'draft', 'pending', 'completed', 'contract_list']
+                    ['create_contract', 'draft', 'pending', 'completed', 'contract_list'],
+                    ['edit_contract']
                 ],
                 // 专利管理
                 [
@@ -371,13 +378,14 @@ if (!isset($_SESSION['user_id'])) {
             const moduleDir = moduleDirs[moduleIndex];
             const menuDir = menuDirs[moduleIndex][menuIndex];
             // 一级菜单无二级菜单，且README.md要求直接在模块目录下的特殊情况
-            // 专利管理-新增专利、专利管理-专利编辑、商标管理-新增商标、版权管理-新增版权、发文管理-发文管理/邮箱管理-邮件分析
+            // 专利管理-新增专利、专利管理-专利编辑、商标管理-新增商标、版权管理-新增版权、客户管理-合同编辑
             if (subIndex === null) {
                 // 这些一级菜单直接在模块目录下
                 if (
                     (moduleDir === 'patent_management' && (menuDir === 'add_patent' || menuDir === 'edit_patent')) ||
                     (moduleDir === 'trademark_management' && (menuDir === 'add_trademark' || menuDir === 'edit_trademark')) ||
-                    (moduleDir === 'copyright_management' && (menuDir === 'add_copyright' || menuDir === 'edit_copyright'))
+                    (moduleDir === 'copyright_management' && (menuDir === 'add_copyright' || menuDir === 'edit_copyright')) ||
+                    (moduleDir === 'customer_management' && menuDir === 'edit_contract')
                 ) {
                     return `modules/${moduleDir}/${fileNames[moduleIndex][menuIndex][0]}.php`;
                 }

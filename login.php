@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin: 0;
             padding: 0;
             /* 背景色改为绿色渐变，从左往右 */
-            background: linear-gradient(to right,rgb(53, 247, 159),rgb(43, 180, 5));
+            background: linear-gradient(to right, rgb(53, 247, 159), rgb(43, 180, 5));
             font-family: "Microsoft YaHei", Arial, sans-serif;
             min-height: 100vh;
         }
@@ -168,12 +168,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin-bottom: 10px;
             font-size: 14px;
         }
+        h1 {
+            font-size: 32px;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
     </style>
 </head>
 
 <body>
     <div class="login-container">
         <div class="login-card">
+            <h1>鸿鼎知识产权系统</h1>
+            <br>
             <div class="login-title">用户登录</div>
             <?php if ($error): ?>
                 <div class="login-error"><?= htmlspecialchars($error) ?></div>
