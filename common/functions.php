@@ -134,6 +134,7 @@ function initSelectSearchBoxes() {
                     hiddenInput.value = value;
                 }
                 
+              
                 // 关闭下拉框
                 list.style.display = 'none';
                 window.moduleDropdownState.openedDropdown = null;

@@ -157,47 +157,111 @@ CREATE TABLE `contract_file` (
     CONSTRAINT `fk_contract_file_user` FOREIGN KEY (`upload_user_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '合同附件表';
 
--- 合同跟进记录表
-CREATE TABLE `contract_follow_record` (
+-- 合同跟进动态表
+CREATE TABLE `contract_follow_up` (
     `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
     `contract_id` INT(11) NOT NULL COMMENT '关联合同ID',
-    `follow_date` DATE NOT NULL COMMENT '跟进日期',
-    `follow_type` VARCHAR(50) NOT NULL COMMENT '跟进类型（电话跟进/邮件跟进/面谈/其他）',
-    `follow_content` TEXT NOT NULL COMMENT '跟进内容',
-    `follow_result` VARCHAR(100) DEFAULT NULL COMMENT '跟进结果',
-    `next_follow_date` DATE DEFAULT NULL COMMENT '下次跟进时间',
-    `follow_user_id` INT(11) NOT NULL COMMENT '跟进人ID，关联user表',
+    `follow_up_method` VARCHAR(50) NOT NULL COMMENT '跟进方式（电话/QQ/微信/拜访/邮件/短信/其他）',
+    `follow_up_time` DATETIME NOT NULL COMMENT '跟进时间',
+    `follow_up_status` VARCHAR(50) NOT NULL COMMENT '跟进状态（未开始/执行中/成功结束/意外终止）',
+    `follow_up_content` TEXT NOT NULL COMMENT '跟进内容',
+    `next_follow_up_time` DATETIME DEFAULT NULL COMMENT '下次跟进时间',
+    `creator_id` INT(11) DEFAULT NULL COMMENT '创建人ID，关联user表',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     KEY `idx_contract_id` (`contract_id`),
-    KEY `idx_follow_user_id` (`follow_user_id`),
-    KEY `idx_follow_date` (`follow_date`),
-    KEY `idx_next_follow_date` (`next_follow_date`),
-    CONSTRAINT `fk_contract_follow_contract` FOREIGN KEY (`contract_id`) REFERENCES `contract`(`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_contract_follow_user` FOREIGN KEY (`follow_user_id`) REFERENCES `user`(`id`) ON DELETE RESTRICT
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '合同跟进记录表';
+    KEY `idx_follow_up_time` (`follow_up_time`),
+    KEY `idx_creator_id` (`creator_id`),
+    CONSTRAINT `fk_contract_follow_up_contract` FOREIGN KEY (`contract_id`) REFERENCES `contract`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_contract_follow_up_creator` FOREIGN KEY (`creator_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '合同跟进动态表';
 
--- 合同付款记录表
-CREATE TABLE `contract_payment_record` (
+-- 回款计划表
+CREATE TABLE `contract_payment_plan` (
     `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
     `contract_id` INT(11) NOT NULL COMMENT '关联合同ID',
-    `payment_date` DATE NOT NULL COMMENT '付款日期',
-    `payment_amount` DECIMAL(12, 2) NOT NULL COMMENT '付款金额',
-    `payment_method` VARCHAR(50) NOT NULL COMMENT '付款方式',
-    `payment_status` VARCHAR(50) NOT NULL COMMENT '付款状态（已付款/部分付款/未付款）',
-    `invoice_no` VARCHAR(100) DEFAULT NULL COMMENT '发票号码',
-    `payment_remarks` TEXT COMMENT '付款备注',
-    `recorder_user_id` INT(11) NOT NULL COMMENT '记录人ID，关联user表',
+    `plan_date` DATE NOT NULL COMMENT '计划回款日期',
+    `currency` VARCHAR(20) DEFAULT '人民币' COMMENT '计划回款币种',
+    `payment_type` VARCHAR(50) DEFAULT '正常回款' COMMENT '回款类型（正常回款/违约/订金）',
+    `remarks` TEXT COMMENT '备注',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     KEY `idx_contract_id` (`contract_id`),
-    KEY `idx_recorder_user_id` (`recorder_user_id`),
+    KEY `idx_plan_date` (`plan_date`),
+    CONSTRAINT `fk_payment_plan_contract` FOREIGN KEY (`contract_id`) REFERENCES `contract`(`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '合同回款计划表';
+
+-- 回款明细表
+CREATE TABLE `contract_payment_detail` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `contract_id` INT(11) NOT NULL COMMENT '关联合同ID',
+    `payment_plan_id` INT(11) DEFAULT NULL COMMENT '关联回款计划ID（可选）',
+    `payment_date` DATE NOT NULL COMMENT '回款日期',
+    `currency` VARCHAR(20) DEFAULT '人民币' COMMENT '回款币种',
+    `payment_currency` VARCHAR(20) DEFAULT '人民币' COMMENT '回款代理费币种',
+    `payment_amount` DECIMAL(12, 2) DEFAULT NULL COMMENT '回款代理费金额',
+    `expense_currency` VARCHAR(20) DEFAULT '人民币' COMMENT '开票金额币种',
+    `expense_amount` DECIMAL(12, 2) DEFAULT NULL COMMENT '开票金额',
+    `invoice_number` VARCHAR(100) DEFAULT NULL COMMENT '发票号码',
+    `invoice_date` DATE DEFAULT NULL COMMENT '开票时间',
+    `payment_method` VARCHAR(50) DEFAULT '支票' COMMENT '付款方式（支票/现金/银行转账/微信/支付宝/其他）',
+    `payment_type_category` VARCHAR(50) DEFAULT '正常回款' COMMENT '回款类型（正常回款/违约/订金）',
+    `payee` VARCHAR(100) DEFAULT NULL COMMENT '收款人',
+    `payee_account` VARCHAR(200) DEFAULT NULL COMMENT '收款人账户',
+    `remarks` TEXT COMMENT '备注',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_contract_id` (`contract_id`),
+    KEY `idx_payment_plan_id` (`payment_plan_id`),
     KEY `idx_payment_date` (`payment_date`),
-    KEY `idx_payment_status` (`payment_status`),
-    CONSTRAINT `fk_contract_payment_contract` FOREIGN KEY (`contract_id`) REFERENCES `contract`(`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_contract_payment_user` FOREIGN KEY (`recorder_user_id`) REFERENCES `user`(`id`) ON DELETE RESTRICT
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '合同付款记录表';
+    KEY `idx_invoice_number` (`invoice_number`),
+    CONSTRAINT `fk_payment_detail_contract` FOREIGN KEY (`contract_id`) REFERENCES `contract`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_payment_detail_plan` FOREIGN KEY (`payment_plan_id`) REFERENCES `contract_payment_plan`(`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '合同回款明细表';
 
-
+-- 合同案件信息表
+CREATE TABLE `contract_case_info` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `contract_id` INT(11) NOT NULL COMMENT '关联合同ID',
+    
+    -- 案件基本信息
+    `case_type` VARCHAR(50) DEFAULT NULL COMMENT '案件类型（专利/商标/版权）',
+    `has_existing_case` TINYINT(1) DEFAULT 0 COMMENT '是否已有案件（0否1是）',
+    `existing_case_id` INT(11) DEFAULT NULL COMMENT '已有案件ID（根据案件类型关联不同表）',
+    `existing_case_code` VARCHAR(50) DEFAULT NULL COMMENT '已有案件编号',
+    `existing_case_name` VARCHAR(200) DEFAULT NULL COMMENT '已有案件名称',
+    `is_case_opened` VARCHAR(10) DEFAULT NULL COMMENT '是否开案（是/否）',
+    `application_country` VARCHAR(100) DEFAULT '中国' COMMENT '申请国家',
+    `case_name` VARCHAR(200) DEFAULT NULL COMMENT '案件名称',
+    `business_dept_id` INT(11) DEFAULT NULL COMMENT '承办部门ID，关联department(id)',
+    `official_fee` DECIMAL(12, 2) DEFAULT NULL COMMENT '官费',
+    `contract_amount` DECIMAL(12, 2) DEFAULT NULL COMMENT '签单金额',
+    `cost` DECIMAL(12, 2) DEFAULT NULL COMMENT '成本',
+    `is_invoiced` VARCHAR(10) DEFAULT NULL COMMENT '是否开票（是/否）',
+    `case_remarks` TEXT COMMENT '备注',
+    
+    -- 业务信息
+    `business_type` VARCHAR(100) DEFAULT NULL COMMENT '业务类型',
+    `application_type` VARCHAR(100) DEFAULT NULL COMMENT '申请类型',
+    `external_agent` VARCHAR(100) DEFAULT NULL COMMENT '外理人',
+    `agency_fee` DECIMAL(12, 2) DEFAULT NULL COMMENT '代理费',
+    `cost_type` VARCHAR(100) DEFAULT NULL COMMENT '成本类型',
+    `page_count` INT DEFAULT NULL COMMENT '页数额',
+    `invoice_amount` DECIMAL(12, 2) DEFAULT NULL COMMENT '开票金额',
+    
+    -- 系统字段
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    
+    PRIMARY KEY (`id`),
+    KEY `idx_contract_id` (`contract_id`),
+    KEY `idx_case_type` (`case_type`),
+    KEY `idx_existing_case_id` (`existing_case_id`),
+    KEY `idx_business_dept_id` (`business_dept_id`),
+    
+    CONSTRAINT `fk_contract_case_contract` FOREIGN KEY (`contract_id`) REFERENCES `contract`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_contract_case_dept` FOREIGN KEY (`business_dept_id`) REFERENCES `department`(`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '合同案件信息表';

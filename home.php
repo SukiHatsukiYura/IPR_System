@@ -8,7 +8,7 @@
             <span class="collapse-arrow">&#9660;</span>
             <h3 class="panel-title"><i class="icon-features"></i> 已开放功能</h3>
         </div>
-        <!-- 改成显示两行，一行3个模块 -->
+        <!-- 改成显示多行，一行3个模块 -->
         <div class="panel-content collapsible-content" id="features-content">
             <div class="features-grid">
                 <div class="feature-category">
@@ -67,6 +67,17 @@
                         </a>
                         <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(3, 1, 0) : alert('框架导航功能不可用')" class="feature-link">
                             <i class="icon-search"></i>版权查询
+                        </a>
+                    </div>
+                </div>
+                <div class="feature-category">
+                    <h4 class="category-title">合同管理</h4>
+                    <div class="feature-links">
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(0, 3, 0) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-add"></i>新增合同
+                        </a>
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(0, 3, 4) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-list"></i>合同列表
                         </a>
                     </div>
                 </div>

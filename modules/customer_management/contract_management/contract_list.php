@@ -247,8 +247,8 @@ function render_customer_search($name, $customers, $get_val)
             <tr>
                 <td class="module-label">合同金额：</td>
                 <td colspan="2">
-                    <input type="number" name="contract_amount_min" class="module-input" style="width:120px;" placeholder="最小金额" step="0.01"> 至
-                    <input type="number" name="contract_amount_max" class="module-input" style="width:120px;" placeholder="最大金额" step="0.01">
+                    <input type="number" name="contract_amount_min" class="module-input" style="width:120px;background-color: #fff;" placeholder="最小金额" step="0.01"> 至
+                    <input type="number" name="contract_amount_max" class="module-input" style="width:120px;background-color: #fff;" placeholder="最大金额" step="0.01">
                 </td>
                 <td class="module-label">签约日期：</td>
                 <td colspan="2">

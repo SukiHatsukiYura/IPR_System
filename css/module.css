@@ -61,6 +61,11 @@
     margin-right: 4px; /* 右间距 */
 }
 
+.icon-list::before {
+    content: "\2630"; /* 列表图标 */
+    margin-right: 4px; /* 右间距 */
+}
+
 /* 通用表格 */
 .module-table {
     width: 100%; /* 宽度100% */
