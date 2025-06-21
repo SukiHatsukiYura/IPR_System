@@ -24,7 +24,7 @@ CREATE TABLE `patent_case_info` (
     `announcement_no` VARCHAR(50) DEFAULT NULL COMMENT '公告号',
     `announcement_date` DATE DEFAULT NULL COMMENT '公告日',
     `certificate_no` VARCHAR(50) DEFAULT NULL COMMENT '证书号',
-    `expire_date` DATE DEFAULT NULL COMMENT '属满日',
+    `expire_date` DATE DEFAULT NULL COMMENT '届满日',
     `enter_substantive_date` DATE DEFAULT NULL COMMENT '进入实审日',
     `application_mode` VARCHAR(100) DEFAULT NULL COMMENT '申请方式',
     `business_user_ids` VARCHAR(200) DEFAULT NULL COMMENT '业务人员ID（多选，逗号分隔，关联user表）',

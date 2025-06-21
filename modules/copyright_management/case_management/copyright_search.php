@@ -221,6 +221,8 @@ function render_customer_search($name, $customers, $get_val)
         <button type="button" class="btn-reset"><i class="icon-cancel"></i> 重置</button>
         <button type="button" class="btn-add" onclick="window.parent.openTab ? window.parent.openTab(3, 0, null) : alert('框架导航功能不可用')"><i class="icon-add"></i> 新增版权</button>
         <button type="button" class="btn-edit" disabled><i class="icon-edit"></i> 修改</button>
+        <button type="button" class="btn-download-template"><i class="icon-save"></i> 下载模板</button>
+        <button type="button" class="btn-batch-import"><i class="icon-add"></i> 批量导入</button>
     </div>
     <form id="search-form" class="module-form" autocomplete="off">
         <input type="hidden" name="page" value="1">
@@ -309,12 +311,63 @@ function render_customer_search($name, $customers, $get_val)
         <button type="button" id="btn-page-jump" class="btn-page-go">确定</button>
     </div>
 </div>
+
+<!-- 批量导入模态框 -->
+<div id="batch-import-modal" class="module-modal" style="display:none;">
+    <div class="module-modal-content" style="width:600px;">
+        <div class="module-modal-header">
+            <h3 class="module-modal-title">批量导入版权案件</h3>
+            <button class="module-modal-close">&times;</button>
+        </div>
+        <div class="module-modal-body" style="padding:20px;">
+            <div style="margin-bottom:20px;">
+                <h4>导入说明：</h4>
+                <ul style="margin:10px 0;padding-left:20px;color:#666;">
+                    <li>请先下载Excel模板文件，使用模板文件填写数据，然后上传文件进行导入</li>
+                    <li>必填字段：案件名称、承办部门ID、客户ID、处理事项</li>
+                    <li>日期格式：YYYY-MM-DD（如：2025-01-01）</li>
+                    <li>支持的文件格式：.xlsx, .xls, .csv</li>
+                    <li>最大文件大小：10MB</li>
+                </ul>
+            </div>
+            <form id="import-form" enctype="multipart/form-data">
+                <table class="module-table">
+                    <tr>
+                        <td class="module-label module-req">*选择文件</td>
+                        <td>
+                            <input type="file" name="import_file" id="import-file" accept=".xlsx,.xls,.csv" class="module-input" required>
+                        </td>
+                    </tr>
+
+                </table>
+            </form>
+            <div id="import-progress" style="display:none;margin-top:20px;">
+                <div style="background:#f0f0f0;border-radius:10px;overflow:hidden;">
+                    <div id="progress-bar" style="height:20px;background:#29b6b0;width:0%;transition:width 0.3s;"></div>
+                </div>
+                <div id="progress-text" style="text-align:center;margin-top:10px;">准备导入...</div>
+            </div>
+            <div id="import-result" style="display:none;margin-top:20px;"></div>
+        </div>
+        <div class="module-modal-footer">
+            <button type="button" class="btn-theme" id="btn-start-import">开始导入</button>
+            <button type="button" class="btn-cancel" id="btn-cancel-import">取消</button>
+        </div>
+    </div>
+</div>
+
 <script>
     (function() {
         var form = document.getElementById('search-form'),
             btnSearch = document.querySelector('.btn-search'),
             btnReset = document.querySelector('.btn-reset'),
             btnEdit = document.querySelector('.btn-edit'),
+            btnDownloadTemplate = document.querySelector('.btn-download-template'),
+            btnBatchImport = document.querySelector('.btn-batch-import'),
+            batchImportModal = document.getElementById('batch-import-modal'),
+            btnStartImport = document.getElementById('btn-start-import'),
+            btnCancelImport = document.getElementById('btn-cancel-import'),
+            modalClose = batchImportModal.querySelector('.module-modal-close'),
             copyrightList = document.getElementById('copyright-list'),
             totalRecordsEl = document.getElementById('total-records'),
             currentPageEl = document.getElementById('current-page'),
@@ -331,7 +384,7 @@ function render_customer_search($name, $customers, $get_val)
             totalPages = 1,
             selectedId = null;
 
-        function loadCopyrightData() {
+        window.loadCopyrightData = function() {
             copyrightList.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">正在加载数据...</td></tr>';
             selectedId = null;
             btnEdit.disabled = true;
@@ -419,25 +472,148 @@ function render_customer_search($name, $customers, $get_val)
         }
         btnSearch.onclick = function() {
             currentPage = 1;
-            loadCopyrightData();
+            window.loadCopyrightData();
         };
         btnReset.onclick = function() {
             form.reset();
             document.querySelectorAll('.module-select-search-input').forEach(i => i.value = '');
             document.querySelectorAll('.module-select-search-box input[type=hidden]').forEach(i => i.value = '');
             currentPage = 1;
-            loadCopyrightData();
+            window.loadCopyrightData();
+        };
+
+        // 下载模板按钮事件
+        btnDownloadTemplate.onclick = function() {
+            var baseUrl = window.location.href.split('?')[0];
+            var downloadUrl = baseUrl.replace('index.php', '') + 'modules/copyright_management/case_management/download_template.php';
+            window.open(downloadUrl, '_blank');
+        };
+
+        // 批量导入按钮事件
+        btnBatchImport.onclick = function() {
+            batchImportModal.style.display = 'flex';
+            // 重置表单
+            document.getElementById('import-form').reset();
+            document.getElementById('import-progress').style.display = 'none';
+            document.getElementById('import-result').style.display = 'none';
+            btnStartImport.disabled = false;
+            btnStartImport.textContent = '开始导入';
+        };
+
+        // 关闭模态框
+        window.closeBatchImportModal = function() {
+            batchImportModal.style.display = 'none';
+        };
+        btnCancelImport.onclick = closeBatchImportModal;
+        modalClose.onclick = closeBatchImportModal;
+
+        // 开始导入按钮事件
+        btnStartImport.onclick = function() {
+            var fileInput = document.getElementById('import-file');
+            var file = fileInput.files[0];
+
+            if (!file) {
+                alert('请选择要导入的Excel文件');
+                return;
+            }
+
+            // 检查文件类型
+            var allowedTypes = [
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-excel',
+                'text/csv',
+                'text/plain',
+                'application/csv'
+            ];
+            if (!allowedTypes.includes(file.type)) {
+                alert('请选择Excel或CSV文件（.xlsx、.xls或.csv格式）');
+                return;
+            }
+
+            // 检查文件大小（10MB）
+            if (file.size > 10 * 1024 * 1024) {
+                alert('文件大小不能超过10MB');
+                return;
+            }
+
+            // 显示进度条
+            document.getElementById('import-progress').style.display = 'block';
+            document.getElementById('import-result').style.display = 'none';
+            btnStartImport.disabled = true;
+            btnStartImport.textContent = '导入中...';
+
+            // 准备表单数据
+            var formData = new FormData(document.getElementById('import-form'));
+            formData.append('action', 'batch_import');
+
+            // 发送请求
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'modules/copyright_management/case_management/batch_import.php', true);
+
+            // 监听上传进度
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    var percentComplete = (e.loaded / e.total) * 100;
+                    document.getElementById('progress-bar').style.width = percentComplete + '%';
+                    document.getElementById('progress-text').textContent = '上传中... ' + Math.round(percentComplete) + '%';
+                }
+            };
+            xhr.onload = function() {
+                btnStartImport.disabled = false;
+                btnStartImport.textContent = '开始导入';
+
+                if (xhr.status === 200) {
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        document.getElementById('progress-bar').style.width = '100%';
+                        document.getElementById('progress-text').textContent = '导入完成';
+
+                        // 显示结果
+                        var resultDiv = document.getElementById('import-result');
+                        resultDiv.style.display = 'block';
+
+                        if (response.success) {
+                            resultDiv.innerHTML = '<div style="color:#388e3c;"><strong>导入成功！</strong><br>' +
+                                '成功导入：' + response.success_count + ' 条<br>' +
+                                (response.error_count > 0 ? '导入失败：' + response.error_count + ' 条<br>' : '') +
+                                (response.errors && response.errors.length > 0 ? '<br>错误详情：<br>' + response.errors.join('<br>') : '') +
+                                '<br><br><button class="btn-theme" onclick="loadCopyrightData(); closeBatchImportModal();">刷新列表并关闭</button>' +
+                                '</div>';
+                        } else {
+                            resultDiv.innerHTML = '<div style="color:#f44336;"><strong>导入失败：</strong><br>' +
+                                (response.message || '未知错误') +
+                                '<br><br><button class="btn-cancel" onclick="closeBatchImportModal();">关闭</button>' +
+                                '</div>';
+                        }
+                    } catch (e) {
+                        document.getElementById('import-result').innerHTML = '<div style="color:#f44336;">导入失败：服务器响应错误</div>';
+                        document.getElementById('import-result').style.display = 'block';
+                    }
+                } else {
+                    document.getElementById('import-result').innerHTML = '<div style="color:#f44336;">导入失败：网络错误</div>';
+                    document.getElementById('import-result').style.display = 'block';
+                }
+            };
+
+            xhr.onerror = function() {
+                btnStartImport.disabled = false;
+                btnStartImport.textContent = '开始导入';
+                document.getElementById('import-result').innerHTML = '<div style="color:#f44336;">导入失败：网络连接错误</div>';
+                document.getElementById('import-result').style.display = 'block';
+            };
+
+            xhr.send(formData);
         };
         pageSizeSelect.onchange = function() {
             pageSize = parseInt(this.value);
             currentPage = 1;
-            loadCopyrightData();
+            window.loadCopyrightData();
         };
         [btnFirstPage, btnPrevPage, btnNextPage, btnLastPage].forEach(function(btn) {
             btn.onclick = function() {
                 if (!this.disabled) {
                     currentPage = parseInt(this.getAttribute('data-page'));
-                    loadCopyrightData();
+                    window.loadCopyrightData();
                 }
             };
         });
@@ -446,7 +622,7 @@ function render_customer_search($name, $customers, $get_val)
             if (isNaN(page) || page < 1) page = 1;
             if (page > totalPages) page = totalPages;
             currentPage = page;
-            loadCopyrightData();
+            window.loadCopyrightData();
         };
 
         // 用户搜索下拉
@@ -505,6 +681,6 @@ function render_customer_search($name, $customers, $get_val)
             };
         }
         document.querySelectorAll('.module-select-search-box').forEach(bindUserSearch);
-        loadCopyrightData();
+        window.loadCopyrightData();
     })();
 </script>

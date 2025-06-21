@@ -55,6 +55,164 @@ $customer_stmt = $pdo->prepare("SELECT id, customer_name_cn FROM customer ORDER 
 $customer_stmt->execute();
 $customers = $customer_stmt->fetchAll();
 
+// 处理图片导入相关AJAX请求
+if (isset($_GET['ajax']) && $_GET['ajax'] == 'image_list') {
+    header('Content-Type: application/json');
+    try {
+        $sql = "SELECT t.id, t.case_code, t.case_name, t.trademark_image_path,
+                (SELECT customer_name_cn FROM customer WHERE id = t.client_id) as client_name
+                FROM trademark_case_info t 
+                ORDER BY t.id DESC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        $trademarks = $stmt->fetchAll();
+
+        echo json_encode([
+            'success' => true,
+            'data' => $trademarks
+        ]);
+    } catch (Exception $e) {
+        echo json_encode([
+            'success' => false,
+            'message' => '查询失败：' . $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
+// 处理图片上传请求
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload_image') {
+    header('Content-Type: application/json');
+
+    function handle_trademark_image_upload($trademark_id)
+    {
+        if (!isset($_FILES['trademark_image']) || $_FILES['trademark_image']['error'] !== UPLOAD_ERR_OK) {
+            throw new Exception('图片上传失败');
+        }
+
+        $file = $_FILES['trademark_image'];
+        $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+
+        if (!in_array($file['type'], $allowed_types)) {
+            throw new Exception('只支持JPG、PNG、GIF格式的图片');
+        }
+
+        // 创建上传目录
+        $upload_dir = __DIR__ . '/../../../uploads/trademark_images/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+
+        // 生成唯一文件名
+        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $filename = 'trademark_' . $trademark_id . '_' . time() . '.' . $extension;
+        $filepath = $upload_dir . $filename;
+
+        if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+            throw new Exception('图片保存失败');
+        }
+
+        return [
+            'path' => 'uploads/trademark_images/' . $filename,
+            'name' => $file['name'],
+            'size' => $file['size'],
+            'type' => $file['type']
+        ];
+    }
+
+    try {
+        $trademark_id = intval($_POST['trademark_id'] ?? 0);
+        if ($trademark_id <= 0) {
+            throw new Exception('商标ID无效');
+        }
+
+        // 检查商标是否存在
+        $check_stmt = $pdo->prepare("SELECT id FROM trademark_case_info WHERE id = ?");
+        $check_stmt->execute([$trademark_id]);
+        if (!$check_stmt->fetch()) {
+            throw new Exception('商标案件不存在');
+        }
+
+        // 处理图片上传
+        $image_info = handle_trademark_image_upload($trademark_id);
+
+        // 更新数据库
+        $update_sql = "UPDATE trademark_case_info SET 
+                      trademark_image_path = ?, 
+                      trademark_image_name = ?, 
+                      trademark_image_size = ?, 
+                      trademark_image_type = ?,
+                      updated_at = NOW()
+                      WHERE id = ?";
+        $update_stmt = $pdo->prepare($update_sql);
+        $result = $update_stmt->execute([
+            $image_info['path'],
+            $image_info['name'],
+            $image_info['size'],
+            $image_info['type'],
+            $trademark_id
+        ]);
+
+        if ($result) {
+            echo json_encode(['success' => true, 'message' => '图片上传成功']);
+        } else {
+            throw new Exception('数据库更新失败');
+        }
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// 处理图片删除请求
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_image') {
+    header('Content-Type: application/json');
+
+    try {
+        $trademark_id = intval($_POST['trademark_id'] ?? 0);
+        if ($trademark_id <= 0) {
+            throw new Exception('商标ID无效');
+        }
+
+        // 获取当前图片信息
+        $check_stmt = $pdo->prepare("SELECT id, trademark_image_path FROM trademark_case_info WHERE id = ?");
+        $check_stmt->execute([$trademark_id]);
+        $trademark = $check_stmt->fetch();
+
+        if (!$trademark) {
+            throw new Exception('商标案件不存在');
+        }
+
+        // 删除物理文件
+        if (!empty($trademark['trademark_image_path'])) {
+            $file_path = __DIR__ . '/../../../' . $trademark['trademark_image_path'];
+            if (file_exists($file_path)) {
+                unlink($file_path);
+            }
+        }
+
+        // 清空数据库中的图片信息
+        $update_sql = "UPDATE trademark_case_info SET 
+                      trademark_image_path = NULL, 
+                      trademark_image_name = NULL, 
+                      trademark_image_size = NULL, 
+                      trademark_image_type = NULL,
+                      updated_at = NOW()
+                      WHERE id = ?";
+        $update_stmt = $pdo->prepare($update_sql);
+        $result = $update_stmt->execute([$trademark_id]);
+
+        if ($result) {
+            echo json_encode(['success' => true, 'message' => '图片删除成功']);
+        } else {
+            throw new Exception('数据库更新失败');
+        }
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // 处理AJAX请求
 if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
     header('Content-Type: application/json');
@@ -106,7 +264,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
     $count_stmt->execute($params);
     $total_records = $count_stmt->fetchColumn();
     $total_pages = ceil($total_records / $page_size);
-  
+
     $sql = "SELECT t.*, 
             (SELECT dept_name FROM department WHERE id = t.business_dept_id) as business_dept_name,
             (SELECT customer_name_cn FROM customer WHERE id = t.client_id) as client_name,
@@ -226,6 +384,9 @@ function render_customer_search($name, $customers, $get_val)
         <button type="button" class="btn-reset"><i class="icon-cancel"></i> 重置</button>
         <button type="button" class="btn-add" onclick="window.parent.openTab ? window.parent.openTab(2, 0, null) : alert('框架导航功能不可用')"><i class="icon-add"></i> 新增商标</button>
         <button type="button" class="btn-edit" disabled><i class="icon-edit"></i> 修改</button>
+        <button type="button" class="btn-download-template"><i class="icon-save"></i> 下载模板</button>
+        <button type="button" class="btn-batch-import"><i class="icon-add"></i> 批量导入</button>
+        <button type="button" class="btn-image-import"><i class="icon-add"></i> 图片导入</button>
     </div>
     <form id="search-form" class="module-form" autocomplete="off">
         <input type="hidden" name="page" value="1">
@@ -315,12 +476,112 @@ function render_customer_search($name, $customers, $get_val)
         <button type="button" id="btn-page-jump" class="btn-page-go">确定</button>
     </div>
 </div>
+
+<!-- 批量导入模态框 -->
+<div id="batch-import-modal" class="module-modal" style="display:none;">
+    <div class="module-modal-content" style="width:600px;">
+        <div class="module-modal-header">
+            <h3 class="module-modal-title">批量导入商标案件</h3>
+            <button class="module-modal-close">&times;</button>
+        </div>
+        <div class="module-modal-body" style="padding:20px;">
+            <div style="margin-bottom:20px;">
+                <h4>导入说明：</h4>
+                <ul style="margin:10px 0;padding-left:20px;color:#666;">
+                    <li>请先下载Excel模板文件，使用模板文件填写数据，然后上传文件进行导入</li>
+                    <li>必填字段：商标名称、承办部门ID、客户ID、处理事项</li>
+                    <li>日期格式：YYYY-MM-DD（如：2025-01-01）</li>
+                    <li>支持的文件格式：.xlsx, .xls, .csv</li>
+                    <li>最大文件大小：10MB</li>
+                </ul>
+            </div>
+            <form id="import-form" enctype="multipart/form-data">
+                <table class="module-table">
+                    <tr>
+                        <td class="module-label module-req">*选择文件</td>
+                        <td>
+                            <input type="file" name="import_file" id="import-file" accept=".xlsx,.xls,.csv" class="module-input" required>
+                        </td>
+                    </tr>
+                </table>
+            </form>
+            <div id="import-progress" style="display:none;margin-top:20px;">
+                <div style="background:#f0f0f0;border-radius:10px;overflow:hidden;">
+                    <div id="progress-bar" style="height:20px;background:#29b6b0;width:0%;transition:width 0.3s;"></div>
+                </div>
+                <div id="progress-text" style="text-align:center;margin-top:10px;">准备导入...</div>
+            </div>
+            <div id="import-result" style="display:none;margin-top:20px;"></div>
+        </div>
+        <div class="module-modal-footer">
+            <button type="button" class="btn-theme" id="btn-start-import">开始导入</button>
+            <button type="button" class="btn-cancel" id="btn-cancel-import">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- 图片导入模态框 -->
+<div id="image-import-modal" class="module-modal" style="display:none;">
+    <div class="module-modal-content" style="width:90%;max-width:1200px;max-height:80vh;">
+        <div class="module-modal-header">
+            <h3 class="module-modal-title">商标图片批量导入</h3>
+            <button class="module-modal-close">&times;</button>
+        </div>
+        <div class="module-modal-body" style="padding:20px;overflow-y:auto;">
+            <div style="margin-bottom:20px;">
+                <h4>导入说明：</h4>
+                <ul style="margin:10px 0;padding-left:20px;color:#666;">
+                    <li>为每个商标案件选择对应的图片文件</li>
+                    <li>支持的图片格式：JPG、PNG、GIF</li>
+                    <li>图片会自动压缩以提高上传速度</li>
+                    <li>支持<strong style="color:#29b6b0;">拖拽上传</strong>：可以直接将图片拖拽到预览区域</li>
+                    <li>支持<strong style="color:#29b6b0;">点击上传</strong>：点击"选择图片"按钮或预览区域选择文件</li>
+                    <li>可以同时为多个案件上传图片</li>
+                    <li>点击预览图可以查看大图</li>
+                </ul>
+            </div>
+            <div id="trademark-image-list">
+                <div style="text-align:center;padding:20px;color:#666;">正在加载商标案件列表...</div>
+            </div>
+            <div id="image-upload-progress" style="display:none;margin-top:20px;">
+                <div style="background:#f0f0f0;border-radius:10px;overflow:hidden;">
+                    <div id="image-progress-bar" style="height:20px;background:#29b6b0;width:0%;transition:width 0.3s;"></div>
+                </div>
+                <div id="image-progress-text" style="text-align:center;margin-top:10px;">准备上传...</div>
+            </div>
+        </div>
+        <div class="module-modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+            <!-- 左侧：批量删除按钮 -->
+            <div>
+                <button type="button" class="btn-cancel" id="btn-batch-delete-images" style="background:#f44336;border-color:#f44336;" disabled>批量删除选中图片</button>
+            </div>
+            <!-- 右侧：保存和取消按钮 -->
+            <div>
+                <button type="button" class="btn-theme" id="btn-save-images">保存所有图片</button>
+                <button type="button" class="btn-cancel" id="btn-cancel-image-import">取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     (function() {
         var form = document.getElementById('search-form'),
             btnSearch = document.querySelector('.btn-search'),
             btnReset = document.querySelector('.btn-reset'),
             btnEdit = document.querySelector('.btn-edit'),
+            btnDownloadTemplate = document.querySelector('.btn-download-template'),
+            btnBatchImport = document.querySelector('.btn-batch-import'),
+            btnImageImport = document.querySelector('.btn-image-import'),
+            batchImportModal = document.getElementById('batch-import-modal'),
+            imageImportModal = document.getElementById('image-import-modal'),
+            btnStartImport = document.getElementById('btn-start-import'),
+            btnCancelImport = document.getElementById('btn-cancel-import'),
+            btnSaveImages = document.getElementById('btn-save-images'),
+            btnBatchDeleteImages = document.getElementById('btn-batch-delete-images'),
+            btnCancelImageImport = document.getElementById('btn-cancel-image-import'),
+            modalClose = batchImportModal.querySelector('.module-modal-close'),
+            imageModalClose = imageImportModal.querySelector('.module-modal-close'),
             trademarkList = document.getElementById('trademark-list'),
             totalRecordsEl = document.getElementById('total-records'),
             currentPageEl = document.getElementById('current-page'),
@@ -337,7 +598,7 @@ function render_customer_search($name, $customers, $get_val)
             totalPages = 1,
             selectedId = null;
 
-        function loadTrademarkData() {
+        window.loadTrademarkData = function() {
             trademarkList.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">正在加载数据...</td></tr>';
             selectedId = null;
             btnEdit.disabled = true;
@@ -391,6 +652,7 @@ function render_customer_search($name, $customers, $get_val)
                 }
             });
         }
+
         btnEdit.onclick = function() {
             if (!selectedId) {
                 alert('请先选择要修改的商标');
@@ -410,6 +672,140 @@ function render_customer_search($name, $customers, $get_val)
                 }
             };
             xhr.send('trademark_id=' + selectedId);
+        };
+
+        // 下载模板按钮事件
+        btnDownloadTemplate.onclick = function() {
+            var baseUrl = window.location.href.split('?')[0];
+            var downloadUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/download_template.php';
+            window.open(downloadUrl, '_blank');
+        };
+        // 批量导入按钮事件
+        btnBatchImport.onclick = function() {
+            batchImportModal.style.display = 'flex';
+            // 重置表单
+            document.getElementById('import-form').reset();
+            document.getElementById('import-progress').style.display = 'none';
+            document.getElementById('import-result').style.display = 'none';
+            btnStartImport.disabled = false;
+            btnStartImport.textContent = '开始导入';
+        };
+
+        // 图片导入按钮事件
+        btnImageImport.onclick = function() {
+            imageImportModal.style.display = 'flex';
+            loadTrademarkImageList();
+        };
+
+        // 关闭模态框
+        window.closeBatchImportModal = function() {
+            batchImportModal.style.display = 'none';
+        };
+        window.closeImageImportModal = function() {
+            imageImportModal.style.display = 'none';
+        };
+        btnCancelImport.onclick = closeBatchImportModal;
+        btnCancelImageImport.onclick = closeImageImportModal;
+        modalClose.onclick = closeBatchImportModal;
+        imageModalClose.onclick = closeImageImportModal;
+
+        // 开始导入按钮事件
+        btnStartImport.onclick = function() {
+            var fileInput = document.getElementById('import-file');
+            var file = fileInput.files[0];
+
+            if (!file) {
+                alert('请选择要导入的Excel文件');
+                return;
+            }
+
+            // 检查文件类型
+            var allowedTypes = [
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-excel',
+                'text/csv',
+                'text/plain',
+                'application/csv'
+            ];
+            if (!allowedTypes.includes(file.type)) {
+                alert('请选择Excel或CSV文件（.xlsx、.xls或.csv格式）');
+                return;
+            }
+
+            // 检查文件大小（10MB）
+            if (file.size > 10 * 1024 * 1024) {
+                alert('文件大小不能超过10MB');
+                return;
+            }
+
+            // 显示进度条
+            document.getElementById('import-progress').style.display = 'block';
+            document.getElementById('import-result').style.display = 'none';
+            btnStartImport.disabled = true;
+            btnStartImport.textContent = '导入中...';
+
+            // 准备表单数据
+            var formData = new FormData(document.getElementById('import-form'));
+            formData.append('action', 'batch_import');
+
+            // 发送请求
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'modules/trademark_management/case_management/batch_import.php', true);
+
+            // 监听上传进度
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    var percentComplete = (e.loaded / e.total) * 100;
+                    document.getElementById('progress-bar').style.width = percentComplete + '%';
+                    document.getElementById('progress-text').textContent = '上传中... ' + Math.round(percentComplete) + '%';
+                }
+            };
+
+            xhr.onload = function() {
+                btnStartImport.disabled = false;
+                btnStartImport.textContent = '开始导入';
+
+                if (xhr.status === 200) {
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        document.getElementById('progress-bar').style.width = '100%';
+                        document.getElementById('progress-text').textContent = '导入完成';
+
+                        // 显示结果
+                        var resultDiv = document.getElementById('import-result');
+                        resultDiv.style.display = 'block';
+
+                        if (response.success) {
+                            resultDiv.innerHTML = '<div style="color:#388e3c;"><strong>导入成功！</strong><br>' +
+                                '成功导入：' + response.success_count + ' 条<br>' +
+                                (response.error_count > 0 ? '导入失败：' + response.error_count + ' 条<br>' : '') +
+                                (response.errors && response.errors.length > 0 ? '<br>错误详情：<br>' + response.errors.join('<br>') : '') +
+                                '<br><br><button class="btn-theme" onclick="loadTrademarkData(); closeBatchImportModal();">刷新列表并关闭</button>' +
+                                '</div>';
+                        } else {
+                            resultDiv.innerHTML = '<div style="color:#f44336;"><strong>导入失败：</strong><br>' +
+                                (response.message || '未知错误') +
+                                '<br><br><button class="btn-cancel" onclick="closeBatchImportModal();">关闭</button>' +
+                                '</div>';
+                        }
+                    } catch (e) {
+                        document.getElementById('import-result').innerHTML = '<div style="color:#f44336;">导入失败：服务器响应错误</div>';
+                        document.getElementById('import-result').style.display = 'block';
+                    }
+                } else {
+                    document.getElementById('import-result').innerHTML = '<div style="color:#f44336;">导入失败：网络错误</div>';
+                    document.getElementById('import-result').style.display = 'block';
+                }
+            };
+
+            xhr.onerror = function() {
+                btnStartImport.disabled = false;
+                btnStartImport.textContent = '开始导入';
+                document.getElementById('import-result').innerHTML = '<div style="color:#f44336;">导入失败：网络连接错误</div>';
+                document.getElementById('import-result').style.display = 'block';
+            };
+
+            xhr.send(formData);
         };
 
         function updatePaginationButtons() {
@@ -511,6 +907,504 @@ function render_customer_search($name, $customers, $get_val)
             };
         }
         document.querySelectorAll('.module-select-search-box').forEach(bindUserSearch);
+
+        // 图片导入相关函数
+        function loadTrademarkImageList() {
+            var imageListDiv = document.getElementById('trademark-image-list');
+            imageListDiv.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">正在加载商标案件列表...</div>';
+
+            var xhr = new XMLHttpRequest();
+            var baseUrl = window.location.href.split('?')[0];
+            var requestUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/trademark_search.php?ajax=image_list';
+            xhr.open('GET', requestUrl, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var response = JSON.parse(xhr.responseText);
+                            if (response.success) {
+                                renderTrademarkImageList(response.data);
+                            } else {
+                                imageListDiv.innerHTML = '<div style="text-align:center;padding:20px;color:#f44336;">加载失败：' + (response.message || '未知错误') + '</div>';
+                            }
+                        } catch (e) {
+                            imageListDiv.innerHTML = '<div style="text-align:center;padding:20px;color:#f44336;">加载失败：数据格式错误</div>';
+                        }
+                    } else {
+                        imageListDiv.innerHTML = '<div style="text-align:center;padding:20px;color:#f44336;">加载失败：网络错误</div>';
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function renderTrademarkImageList(trademarks) {
+            var imageListDiv = document.getElementById('trademark-image-list');
+            if (!trademarks || trademarks.length === 0) {
+                imageListDiv.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">暂无商标案件</div>';
+                return;
+            }
+
+            var html = '<table class="module-table" style="width:100%;">';
+            html += '<thead><tr style="background:#f2f2f2;">';
+            html += '<th style="width:50px;text-align:center;"><input type="checkbox" id="select-all-images" title="全选/取消全选" style="width:18px;height:18px;cursor:pointer;"> 全选</th>';
+            html += '<th style="width:100px;">我方文号</th>';
+            html += '<th style="width:150px;">商标名称</th>';
+            html += '<th style="width:100px;">客户名称</th>';
+            html += '<th style="width:120px;">当前图片</th>';
+            html += '<th style="width:150px;">上传新图片</th>';
+            html += '<th style="width:120px;">预览</th>';
+            html += '</tr></thead><tbody>';
+
+            trademarks.forEach(function(trademark) {
+                html += '<tr data-id="' + trademark.id + '">';
+
+                // 勾选框列 - 只有已有图片的案件才显示勾选框
+                html += '<td style="text-align:center;">';
+                if (trademark.trademark_image_path) {
+                    html += '<input type="checkbox" class="image-checkbox" value="' + trademark.id + '" data-case-code="' + (trademark.case_code || '') + '" style="width:18px;height:18px;cursor:pointer;">';
+                } else {
+                    html += '<span style="color:#ccc;">-</span>';
+                }
+                html += '</td>';
+
+                html += '<td>' + (trademark.case_code || '') + '</td>';
+                html += '<td>' + (trademark.case_name || '') + '</td>';
+                html += '<td>' + (trademark.client_name || '') + '</td>';
+
+                // 当前图片
+                html += '<td style="text-align:center;">';
+                if (trademark.trademark_image_path) {
+                    html += '<img src="' + trademark.trademark_image_path + '" style="width:60px;height:60px;object-fit:contain;border:1px solid #ddd;border-radius:4px;cursor:pointer;" onclick="showImagePreview(\'' + trademark.trademark_image_path + '\')">';
+                } else {
+                    html += '<span style="color:#999;">暂无图片</span>';
+                }
+                html += '</td>';
+
+                // 上传新图片
+                html += '<td>';
+                html += '<div style="display:flex;align-items:center;gap:10px;">';
+                html += '<input type="file" id="file-' + trademark.id + '" accept="image/*" style="display:none;" onchange="handleImageSelect(' + trademark.id + ', this)">';
+                html += '<button type="button" class="btn-mini" onclick="document.getElementById(\'file-' + trademark.id + '\').click()">选择图片</button>';
+                html += '<span id="filename-' + trademark.id + '" style="font-size:12px;color:#666;"></span>';
+                html += '</div>';
+                html += '</td>';
+
+                // 预览
+                html += '<td style="text-align:center;">';
+                html += '<div id="preview-' + trademark.id + '" class="image-drop-zone" data-trademark-id="' + trademark.id + '" style="width:60px;height:60px;border:2px dashed #ddd;display:flex;align-items:center;justify-content:center;background:#f9f9f9;border-radius:4px;margin:0 auto;cursor:pointer;transition:all 0.3s;" title="点击或拖拽图片到此处">';
+                html += '<span style="color:#999;font-size:12px;">拖拽或点击</span>';
+                html += '</div>';
+                html += '</td>';
+
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            imageListDiv.innerHTML = html;
+
+            // 绑定拖拽事件
+            bindDragDropEvents();
+
+            // 绑定勾选框事件
+            bindCheckboxEvents();
+        }
+
+        // 绑定勾选框事件
+        function bindCheckboxEvents() {
+            var selectAllCheckbox = document.getElementById('select-all-images');
+            var imageCheckboxes = document.querySelectorAll('.image-checkbox');
+
+            // 全选/取消全选功能
+            if (selectAllCheckbox) {
+                selectAllCheckbox.addEventListener('change', function() {
+                    var isChecked = this.checked;
+                    imageCheckboxes.forEach(function(checkbox) {
+                        checkbox.checked = isChecked;
+                    });
+                    updateBatchDeleteButton();
+                });
+            }
+
+            // 单个勾选框变化
+            imageCheckboxes.forEach(function(checkbox) {
+                checkbox.addEventListener('change', function() {
+                    // 更新全选框状态
+                    var checkedCount = document.querySelectorAll('.image-checkbox:checked').length;
+                    var totalCount = imageCheckboxes.length;
+
+                    if (selectAllCheckbox) {
+                        selectAllCheckbox.checked = checkedCount === totalCount && totalCount > 0;
+                        selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < totalCount;
+                    }
+
+                    updateBatchDeleteButton();
+                });
+            });
+        }
+
+        // 更新批量删除按钮状态
+        function updateBatchDeleteButton() {
+            var checkedBoxes = document.querySelectorAll('.image-checkbox:checked');
+            if (btnBatchDeleteImages) {
+                btnBatchDeleteImages.disabled = checkedBoxes.length === 0;
+                btnBatchDeleteImages.textContent = checkedBoxes.length > 0 ?
+                    '批量删除选中图片 (' + checkedBoxes.length + ')' : '批量删除选中图片';
+            }
+        }
+
+        // 绑定拖拽事件
+        function bindDragDropEvents() {
+            var dropZones = document.querySelectorAll('.image-drop-zone');
+
+            dropZones.forEach(function(dropZone) {
+                var trademarkId = dropZone.getAttribute('data-trademark-id');
+
+                // 点击事件 - 触发文件选择
+                dropZone.addEventListener('click', function() {
+                    var fileInput = document.getElementById('file-' + trademarkId);
+                    if (fileInput) {
+                        fileInput.click();
+                    }
+                });
+
+                // 拖拽进入
+                dropZone.addEventListener('dragenter', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.style.borderColor = '#29b6b0';
+                    this.style.backgroundColor = '#e8f5f4';
+                    this.style.transform = 'scale(1.05)';
+                });
+
+                // 拖拽悬停
+                dropZone.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.style.borderColor = '#29b6b0';
+                    this.style.backgroundColor = '#e8f5f4';
+                });
+
+                // 拖拽离开
+                dropZone.addEventListener('dragleave', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // 检查是否真的离开了区域（防止子元素触发）
+                    if (!this.contains(e.relatedTarget)) {
+                        this.style.borderColor = '#ddd';
+                        this.style.backgroundColor = '#f9f9f9';
+                        this.style.transform = 'scale(1)';
+                    }
+                });
+
+                // 文件放置
+                dropZone.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // 恢复样式
+                    this.style.borderColor = '#ddd';
+                    this.style.backgroundColor = '#f9f9f9';
+                    this.style.transform = 'scale(1)';
+
+                    var files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        var file = files[0];
+
+                        // 检查文件类型
+                        if (!file.type.startsWith('image/')) {
+                            alert('请拖拽图片文件');
+                            return;
+                        }
+
+                        // 直接更新真实的file input，然后调用处理函数
+                        var fileInput = document.getElementById('file-' + trademarkId);
+                        if (fileInput) {
+                            var dataTransfer = new DataTransfer();
+                            dataTransfer.items.add(file);
+                            fileInput.files = dataTransfer.files;
+
+                            // 调用图片处理函数
+                            handleImageSelect(trademarkId, fileInput);
+                        }
+                    }
+                });
+            });
+        }
+
+        // 图片压缩函数
+        function compressImage(file, maxWidth = 800, quality = 0.8) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+
+                img.onload = function() {
+                    // 计算压缩比例
+                    const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
+                    const newWidth = img.width * ratio;
+                    const newHeight = img.height * ratio;
+
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+
+                    // 绘制压缩后的图片
+                    ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+                    // 转换为Blob对象
+                    canvas.toBlob(function(blob) {
+                        // 创建新的File对象，保持原文件名和类型
+                        const compressedFile = new File([blob], file.name, {
+                            type: file.type,
+                            lastModified: Date.now()
+                        });
+                        resolve(compressedFile);
+                    }, file.type, quality);
+                };
+
+                img.src = URL.createObjectURL(file);
+            });
+        }
+
+        window.handleImageSelect = function(trademarkId, input) {
+            var file = input.files[0];
+            if (!file) return;
+
+            // 检查文件类型
+            if (!file.type.startsWith('image/')) {
+                alert('请选择图片文件');
+                return;
+            }
+
+            // 显示原始文件名和大小
+            var fileSizeText = (file.size / 1024 / 1024).toFixed(2) + 'MB';
+            document.getElementById('filename-' + trademarkId).innerHTML = file.name + ' (' + fileSizeText + ')';
+
+            var previewDiv = document.getElementById('preview-' + trademarkId);
+
+            // 显示压缩中状态
+            previewDiv.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;"><div style="font-size:12px;color:#666;">压缩中...</div></div>';
+
+            // 压缩图片
+            compressImage(file, 800, 0.8).then(function(compressedFile) {
+                // 保存压缩后的文件到input（用于后续上传）
+                var dataTransfer = new DataTransfer();
+                dataTransfer.items.add(compressedFile);
+                input.files = dataTransfer.files;
+
+                // 更新文件大小显示
+                var compressedSizeText = (compressedFile.size / 1024 / 1024).toFixed(2) + 'MB';
+                document.getElementById('filename-' + trademarkId).innerHTML = file.name + ' (原: ' + fileSizeText + ' → 压缩后: ' + compressedSizeText + ')';
+
+                // 显示预览
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    previewDiv.innerHTML = '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:contain;border-radius:4px;cursor:pointer;" onclick="showImagePreview(\'' + e.target.result + '\')" title="点击查看大图">';
+                };
+                reader.readAsDataURL(compressedFile);
+            }).catch(function(error) {
+                console.error('图片压缩失败:', error);
+                // 压缩失败时使用原图
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    previewDiv.innerHTML = '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:contain;border-radius:4px;cursor:pointer;" onclick="showImagePreview(\'' + e.target.result + '\')" title="点击查看大图">';
+                };
+                reader.readAsDataURL(file);
+            });
+        };
+
+        window.showImagePreview = function(imageSrc) {
+            var modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:10000;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = '<div style="position:relative;max-width:90%;max-height:90%;"><img src="' + imageSrc + '" style="max-width:100%;max-height:100%;"><button style="position:absolute;top:-40px;right:0;background:#fff;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:18px;">&times;</button></div>';
+            document.body.appendChild(modal);
+
+            modal.onclick = function(e) {
+                if (e.target === modal || e.target.tagName === 'BUTTON') {
+                    document.body.removeChild(modal);
+                }
+            };
+        };
+
+        // 批量删除图片按钮事件
+        btnBatchDeleteImages.onclick = function() {
+            var checkedBoxes = document.querySelectorAll('.image-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('请选择要删除图片的案件');
+                return;
+            }
+
+            var caseList = [];
+            checkedBoxes.forEach(function(checkbox) {
+                caseList.push(checkbox.getAttribute('data-case-code'));
+            });
+
+            if (!confirm('确定要删除选中的 ' + checkedBoxes.length + ' 个案件的图片吗？\n案件：' + caseList.join(', '))) {
+                return;
+            }
+
+            // 显示删除进度
+            var progressDiv = document.getElementById('image-upload-progress');
+            progressDiv.style.display = 'block';
+            progressDiv.innerHTML = '<div style="text-align:center;padding:20px;color:#f44336;">正在删除图片...</div>';
+
+            btnBatchDeleteImages.disabled = true;
+            btnBatchDeleteImages.textContent = '删除中...';
+
+            // 批量删除图片
+            batchDeleteImages(Array.from(checkedBoxes).map(cb => cb.value));
+        };
+
+        // 批量删除图片函数
+        function batchDeleteImages(trademarkIds) {
+            var completed = 0;
+            var errors = [];
+            var total = trademarkIds.length;
+
+            function deleteNext() {
+                if (completed >= total) {
+                    // 所有删除完成
+                    var progressDiv = document.getElementById('image-upload-progress');
+                    if (errors.length === 0) {
+                        progressDiv.innerHTML = '<div style="text-align:center;padding:20px;color:#388e3c;">✓ 所有图片删除成功！</div>';
+                        // 2秒后重新加载列表
+                        setTimeout(function() {
+                            loadTrademarkImageList();
+                            progressDiv.style.display = 'none';
+                        }, 2000);
+                    } else {
+                        progressDiv.innerHTML = '<div style="text-align:center;padding:20px;color:#f44336;">删除完成，但有 ' + errors.length + ' 个失败</div>';
+                    }
+
+                    btnBatchDeleteImages.disabled = false;
+                    btnBatchDeleteImages.textContent = '批量删除选中图片';
+                    return;
+                }
+
+                var trademarkId = trademarkIds[completed];
+                var progressDiv = document.getElementById('image-upload-progress');
+                progressDiv.innerHTML = '<div style="text-align:center;padding:20px;color:#f44336;">正在删除第 ' + (completed + 1) + '/' + total + ' 个图片...</div>';
+
+                // 发送删除请求
+                var xhr = new XMLHttpRequest();
+                var baseUrl = window.location.href.split('?')[0];
+                var requestUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/trademark_search.php';
+                xhr.open('POST', requestUrl, true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        completed++;
+                        try {
+                            var response = JSON.parse(xhr.responseText);
+                            if (!response.success) {
+                                errors.push('案件ID ' + trademarkId + ': ' + (response.message || '删除失败'));
+                            }
+                        } catch (e) {
+                            errors.push('案件ID ' + trademarkId + ': 响应解析失败');
+                        }
+                        deleteNext();
+                    }
+                };
+
+                xhr.send('action=delete_image&trademark_id=' + encodeURIComponent(trademarkId));
+            }
+
+            deleteNext();
+        }
+
+        // 保存所有图片按钮事件
+        btnSaveImages.onclick = function() {
+            var uploadData = [];
+            var fileInputs = document.querySelectorAll('#trademark-image-list input[type="file"]');
+
+            fileInputs.forEach(function(input) {
+                if (input.files[0]) {
+                    var trademarkId = input.id.replace('file-', '');
+                    uploadData.push({
+                        id: trademarkId,
+                        file: input.files[0]
+                    });
+                }
+            });
+
+            if (uploadData.length === 0) {
+                alert('请至少选择一个图片文件');
+                return;
+            }
+
+            // 显示进度
+            document.getElementById('image-upload-progress').style.display = 'block';
+            btnSaveImages.disabled = true;
+            btnSaveImages.textContent = '上传中...';
+
+            uploadImagesSequentially(uploadData, 0);
+        };
+
+        function uploadImagesSequentially(uploadData, index) {
+            if (index >= uploadData.length) {
+                // 全部上传完成
+                document.getElementById('image-progress-bar').style.width = '100%';
+                document.getElementById('image-progress-text').textContent = '所有图片上传完成！';
+                btnSaveImages.disabled = false;
+                btnSaveImages.textContent = '保存所有图片';
+
+                setTimeout(function() {
+                    alert('图片上传完成！');
+                    closeImageImportModal();
+                    loadTrademarkData(); // 刷新主列表
+                }, 1000);
+                return;
+            }
+
+            var item = uploadData[index];
+            var progress = ((index + 1) / uploadData.length) * 100;
+            document.getElementById('image-progress-bar').style.width = progress + '%';
+            document.getElementById('image-progress-text').textContent = '正在上传第 ' + (index + 1) + ' 个图片，共 ' + uploadData.length + ' 个...';
+
+            var formData = new FormData();
+            formData.append('action', 'upload_image');
+            formData.append('trademark_id', item.id);
+            formData.append('trademark_image', item.file);
+
+            var xhr = new XMLHttpRequest();
+            var baseUrl = window.location.href.split('?')[0];
+            var uploadUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/trademark_search.php';
+            xhr.open('POST', uploadUrl, true);
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        if (response.success) {
+                            // 继续上传下一个
+                            uploadImagesSequentially(uploadData, index + 1);
+                        } else {
+                            alert('上传失败：' + (response.message || '未知错误'));
+                            btnSaveImages.disabled = false;
+                            btnSaveImages.textContent = '保存所有图片';
+                        }
+                    } catch (e) {
+                        alert('上传失败：服务器响应错误');
+                        btnSaveImages.disabled = false;
+                        btnSaveImages.textContent = '保存所有图片';
+                    }
+                } else {
+                    alert('上传失败：网络错误');
+                    btnSaveImages.disabled = false;
+                    btnSaveImages.textContent = '保存所有图片';
+                }
+            };
+
+            xhr.onerror = function() {
+                alert('上传失败：网络连接错误');
+                btnSaveImages.disabled = false;
+                btnSaveImages.textContent = '保存所有图片';
+            };
+
+            xhr.send(formData);
+        }
+
         loadTrademarkData();
     })();
 </script>

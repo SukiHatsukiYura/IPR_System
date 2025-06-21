@@ -31,143 +31,175 @@ if (!$trademark_info) {
     exit;
 }
 
-// 处理POST请求（保存数据）
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save') {
+// 处理POST请求（保存数据和删除图片）
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json');
 
-    // 处理图片上传
-    function handle_image_upload($case_code, $old_image_path = null)
-    {
-        if (!isset($_FILES['trademark_image']) || $_FILES['trademark_image']['error'] !== UPLOAD_ERR_OK) {
-            return null;
+    // 处理删除图片
+    if ($_POST['action'] === 'delete_image') {
+        try {
+            // 获取当前图片信息
+            $stmt = $pdo->prepare("SELECT trademark_image_path FROM trademark_case_info WHERE id = ?");
+            $stmt->execute([$trademark_id]);
+            $current_image = $stmt->fetchColumn();
+
+            if ($current_image) {
+                // 删除物理文件
+                $file_path = __DIR__ . '/../../../' . $current_image;
+                if (file_exists($file_path)) {
+                    unlink($file_path);
+                }
+
+                // 清空数据库中的图片字段
+                $stmt = $pdo->prepare("UPDATE trademark_case_info SET trademark_image_path = NULL, trademark_image_name = NULL, trademark_image_size = NULL, trademark_image_type = NULL WHERE id = ?");
+                $result = $stmt->execute([$trademark_id]);
+
+                echo json_encode(['success' => $result, 'msg' => $result ? '图片删除成功' : '图片删除失败']);
+            } else {
+                echo json_encode(['success' => true, 'msg' => '没有图片需要删除']);
+            }
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'msg' => '删除图片失败: ' . $e->getMessage()]);
         }
-
-        $file = $_FILES['trademark_image'];
-        $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-        $max_size = 5 * 1024 * 1024; // 5MB
-
-        if (!in_array($file['type'], $allowed_types)) {
-            throw new Exception('只支持JPG、PNG、GIF格式的图片');
-        }
-
-        if ($file['size'] > $max_size) {
-            throw new Exception('图片文件大小不能超过5MB');
-        }
-
-        // 创建上传目录
-        $upload_dir = __DIR__ . '/../../../uploads/trademark_images/';
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0755, true);
-        }
-
-        // 删除旧图片
-        if ($old_image_path && file_exists(__DIR__ . '/../../../' . $old_image_path)) {
-            unlink(__DIR__ . '/../../../' . $old_image_path);
-        }
-
-        // 生成唯一文件名
-        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-        $filename = $case_code . '_' . time() . '.' . $extension;
-        $filepath = $upload_dir . $filename;
-
-        if (!move_uploaded_file($file['tmp_name'], $filepath)) {
-            throw new Exception('图片上传失败');
-        }
-
-        return [
-            'path' => 'uploads/trademark_images/' . $filename,
-            'name' => $file['name'],
-            'size' => $file['size'],
-            'type' => $file['type']
-        ];
+        exit;
     }
 
-    $data = [
-        'case_name' => trim($_POST['case_name'] ?? ''),
-        'case_name_en' => trim($_POST['case_name_en'] ?? ''),
-        'application_no' => trim($_POST['application_no'] ?? ''),
-        'business_dept_id' => intval($_POST['business_dept_id'] ?? 0),
-        'trademark_class' => trim($_POST['trademark_class'] ?? ''),
-        'initial_publication_date' => trim($_POST['initial_publication_date'] ?? ''),
-        'initial_publication_period' => trim($_POST['initial_publication_period'] ?? ''),
-        'client_id' => intval($_POST['client_id'] ?? 0),
-        'case_type' => trim($_POST['case_type'] ?? ''),
-        'business_type' => trim($_POST['business_type'] ?? ''),
-        'entrust_date' => trim($_POST['entrust_date'] ?? ''),
-        'case_status' => trim($_POST['case_status'] ?? ''),
-        'process_item' => trim($_POST['process_item'] ?? ''),
-        'source_country' => trim($_POST['source_country'] ?? ''),
-        'trademark_description' => trim($_POST['trademark_description'] ?? ''),
-        'other_name' => trim($_POST['other_name'] ?? ''),
-        'application_date' => trim($_POST['application_date'] ?? ''),
-        'business_user_ids' => trim($_POST['business_user_ids'] ?? ''),
-        'business_assistant_ids' => trim($_POST['business_assistant_ids'] ?? ''),
-        'trademark_type' => trim($_POST['trademark_type'] ?? ''),
-        'initial_publication_no' => trim($_POST['initial_publication_no'] ?? ''),
-        'registration_no' => trim($_POST['registration_no'] ?? ''),
-        'country' => trim($_POST['country'] ?? ''),
-        'case_flow' => trim($_POST['case_flow'] ?? ''),
-        'application_mode' => trim($_POST['application_mode'] ?? ''),
-        'open_date' => trim($_POST['open_date'] ?? ''),
-        'client_case_code' => trim($_POST['client_case_code'] ?? ''),
-        'approval_date' => trim($_POST['approval_date'] ?? ''),
-        'remarks' => trim($_POST['remarks'] ?? ''),
-        'is_main_case' => intval($_POST['is_main_case'] ?? 0),
-        'registration_publication_date' => trim($_POST['registration_publication_date'] ?? ''),
-        'registration_publication_period' => trim($_POST['registration_publication_period'] ?? ''),
-        'client_status' => trim($_POST['client_status'] ?? ''),
-        'renewal_date' => trim($_POST['renewal_date'] ?? ''),
-        'expire_date' => trim($_POST['expire_date'] ?? ''),
-    ];
-
-    // 修正：所有DATE类型字段为空字符串时转为null
-    $date_fields = [
-        'initial_publication_date',
-        'entrust_date',
-        'application_date',
-        'open_date',
-        'approval_date',
-        'registration_publication_date',
-        'renewal_date',
-        'expire_date'
-    ];
-    foreach ($date_fields as $field) {
-        if (isset($data[$field]) && $data[$field] === '') {
-            $data[$field] = null;
-        }
-    }
-
-    // 修正：所有外键字段为0或小于0时转为null
-    $fk_fields = ['business_dept_id', 'client_id'];
-    foreach ($fk_fields as $field) {
-        if (isset($data[$field]) && $data[$field] <= 0) {
-            $data[$field] = null;
-        }
-    }
-
-    try {
+    // 处理保存数据
+    if ($_POST['action'] === 'save') {
         // 处理图片上传
-        $image_info = handle_image_upload($trademark_info['case_code'], $trademark_info['trademark_image_path']);
-        if ($image_info) {
-            $data['trademark_image_path'] = $image_info['path'];
-            $data['trademark_image_name'] = $image_info['name'];
-            $data['trademark_image_size'] = $image_info['size'];
-            $data['trademark_image_type'] = $image_info['type'];
+        function handle_image_upload($case_code, $old_image_path = null)
+        {
+            if (!isset($_FILES['trademark_image']) || $_FILES['trademark_image']['error'] !== UPLOAD_ERR_OK) {
+                return null;
+            }
+
+            $file = $_FILES['trademark_image'];
+            $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+            $max_size = 5 * 1024 * 1024; // 5MB
+
+            if (!in_array($file['type'], $allowed_types)) {
+                throw new Exception('只支持JPG、PNG、GIF格式的图片');
+            }
+
+            if ($file['size'] > $max_size) {
+                throw new Exception('图片文件大小不能超过5MB');
+            }
+
+            // 创建上传目录
+            $upload_dir = __DIR__ . '/../../../uploads/trademark_images/';
+            if (!is_dir($upload_dir)) {
+                mkdir($upload_dir, 0755, true);
+            }
+
+            // 删除旧图片
+            if ($old_image_path && file_exists(__DIR__ . '/../../../' . $old_image_path)) {
+                unlink(__DIR__ . '/../../../' . $old_image_path);
+            }
+
+            // 生成唯一文件名
+            $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $filename = $case_code . '_' . time() . '.' . $extension;
+            $filepath = $upload_dir . $filename;
+
+            if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+                throw new Exception('图片上传失败');
+            }
+
+            return [
+                'path' => 'uploads/trademark_images/' . $filename,
+                'name' => $file['name'],
+                'size' => $file['size'],
+                'type' => $file['type']
+            ];
         }
 
-        $set = [];
-        foreach ($data as $k => $v) {
-            $set[] = "$k = :$k";
+        $data = [
+            'case_name' => trim($_POST['case_name'] ?? ''),
+            'case_name_en' => trim($_POST['case_name_en'] ?? ''),
+            'application_no' => trim($_POST['application_no'] ?? ''),
+            'business_dept_id' => intval($_POST['business_dept_id'] ?? 0),
+            'trademark_class' => trim($_POST['trademark_class'] ?? ''),
+            'initial_publication_date' => trim($_POST['initial_publication_date'] ?? ''),
+            'initial_publication_period' => trim($_POST['initial_publication_period'] ?? ''),
+            'client_id' => intval($_POST['client_id'] ?? 0),
+            'case_type' => trim($_POST['case_type'] ?? ''),
+            'business_type' => trim($_POST['business_type'] ?? ''),
+            'entrust_date' => trim($_POST['entrust_date'] ?? ''),
+            'case_status' => trim($_POST['case_status'] ?? ''),
+            'process_item' => trim($_POST['process_item'] ?? ''),
+            'source_country' => trim($_POST['source_country'] ?? ''),
+            'trademark_description' => trim($_POST['trademark_description'] ?? ''),
+            'other_name' => trim($_POST['other_name'] ?? ''),
+            'application_date' => trim($_POST['application_date'] ?? ''),
+            'business_user_ids' => trim($_POST['business_user_ids'] ?? ''),
+            'business_assistant_ids' => trim($_POST['business_assistant_ids'] ?? ''),
+            'trademark_type' => trim($_POST['trademark_type'] ?? ''),
+            'initial_publication_no' => trim($_POST['initial_publication_no'] ?? ''),
+            'registration_no' => trim($_POST['registration_no'] ?? ''),
+            'country' => trim($_POST['country'] ?? ''),
+            'case_flow' => trim($_POST['case_flow'] ?? ''),
+            'application_mode' => trim($_POST['application_mode'] ?? ''),
+            'open_date' => trim($_POST['open_date'] ?? ''),
+            'client_case_code' => trim($_POST['client_case_code'] ?? ''),
+            'approval_date' => trim($_POST['approval_date'] ?? ''),
+            'remarks' => trim($_POST['remarks'] ?? ''),
+            'is_main_case' => intval($_POST['is_main_case'] ?? 0),
+            'registration_publication_date' => trim($_POST['registration_publication_date'] ?? ''),
+            'registration_publication_period' => trim($_POST['registration_publication_period'] ?? ''),
+            'client_status' => trim($_POST['client_status'] ?? ''),
+            'renewal_date' => trim($_POST['renewal_date'] ?? ''),
+            'expire_date' => trim($_POST['expire_date'] ?? ''),
+        ];
+
+        // 修正：所有DATE类型字段为空字符串时转为null
+        $date_fields = [
+            'initial_publication_date',
+            'entrust_date',
+            'application_date',
+            'open_date',
+            'approval_date',
+            'registration_publication_date',
+            'renewal_date',
+            'expire_date'
+        ];
+        foreach ($date_fields as $field) {
+            if (isset($data[$field]) && $data[$field] === '') {
+                $data[$field] = null;
+            }
         }
-        $data['id'] = $trademark_id;
-        $sql = "UPDATE trademark_case_info SET " . implode(',', $set) . " WHERE id = :id";
-        $stmt = $pdo->prepare($sql);
-        $result = $stmt->execute($data);
-        echo json_encode(['success' => $result, 'msg' => $result ? null : '更新失败']);
-    } catch (Exception $e) {
-        echo json_encode(['success' => false, 'msg' => '数据库异常: ' . $e->getMessage()]);
+
+        // 修正：所有外键字段为0或小于0时转为null
+        $fk_fields = ['business_dept_id', 'client_id'];
+        foreach ($fk_fields as $field) {
+            if (isset($data[$field]) && $data[$field] <= 0) {
+                $data[$field] = null;
+            }
+        }
+
+        try {
+            // 处理图片上传
+            $image_info = handle_image_upload($trademark_info['case_code'], $trademark_info['trademark_image_path']);
+            if ($image_info) {
+                $data['trademark_image_path'] = $image_info['path'];
+                $data['trademark_image_name'] = $image_info['name'];
+                $data['trademark_image_size'] = $image_info['size'];
+                $data['trademark_image_type'] = $image_info['type'];
+            }
+
+            $set = [];
+            foreach ($data as $k => $v) {
+                $set[] = "$k = :$k";
+            }
+            $data['id'] = $trademark_id;
+            $sql = "UPDATE trademark_case_info SET " . implode(',', $set) . " WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            $result = $stmt->execute($data);
+            echo json_encode(['success' => $result, 'msg' => $result ? null : '更新失败']);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'msg' => '数据库异常: ' . $e->getMessage()]);
+        }
+        exit;
     }
-    exit;
 }
 
 // 查询动态数据
@@ -285,197 +317,197 @@ render_select_search_assets();
 ?>
 
 <!-- <div class="module-panel"> -->
-    <div class="module-btns">
-        <button type="button" class="btn-save"><i class="icon-save"></i> 保存</button>
-        <button type="button" class="btn-cancel"><i class="icon-cancel"></i> 取消</button>
-    </div>
+<div class="module-btns">
+    <button type="button" class="btn-save"><i class="icon-save"></i> 保存</button>
+    <button type="button" class="btn-cancel"><i class="icon-cancel"></i> 取消</button>
+</div>
 
-    <form id="edit-trademark-form" class="module-form" autocomplete="off" enctype="multipart/form-data">
-        <table class="module-table" style="width:100%;max-width:1800px;table-layout:fixed;">
-            <colgroup>
-                <col style="width:120px;">
-                <col style="width:220px;">
-                <col style="width:120px;">
-                <col style="width:220px;">
-                <col style="width:120px;">
-                <col style="width:220px;">
-            </colgroup>
-            <tr>
-                <td class="module-label">我方文号</td>
-                <td><input type="text" name="case_code" class="module-input" value="<?= h($trademark_info['case_code']) ?>" readonly></td>
-                <td class="module-label module-req">*商标名称</td>
-                <td><input type="text" name="case_name" class="module-input" value="<?= h($trademark_info['case_name']) ?>" required></td>
-                <td class="module-label">商标图片</td>
-                <td>
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <div id="image-preview" style="width:80px;height:80px;border:2px dashed #ddd;display:flex;align-items:center;justify-content:center;background:#f9f9f9;border-radius:4px;position:relative;">
-                            <?php if ($trademark_info['trademark_image_path']): ?>
-                                <img id="preview-img" src="<?= h($trademark_info['trademark_image_path']) ?>" style="width:100%;height:100%;object-fit:contain;border-radius:4px;">
-                            <?php else: ?>
-                                <span style="color:#999;font-size:12px;text-align:center;">暂无图片</span>
-                                <img id="preview-img" style="display:none;width:100%;height:100%;object-fit:contain;border-radius:4px;">
-                            <?php endif; ?>
-                        </div>
-                        <div>
-                            <input type="file" id="trademark-image" name="trademark_image" accept="image/*" style="display:none;">
-                            <button type="button" id="upload-btn" class="btn-mini" style="background:#29b6b0;color:#fff;border:none;padding:6px 12px;">上传</button>
-                            <button type="button" id="remove-btn" class="btn-mini" style="<?= $trademark_info['trademark_image_path'] ? '' : 'display:none;' ?>margin-left:5px;">删除</button>
-                            <div style="font-size:12px;color:#666;margin-top:5px;">支持JPG、PNG、GIF<br>最大5MB</div>
-                        </div>
+<form id="edit-trademark-form" class="module-form" autocomplete="off" enctype="multipart/form-data">
+    <table class="module-table" style="width:100%;max-width:1800px;table-layout:fixed;">
+        <colgroup>
+            <col style="width:120px;">
+            <col style="width:220px;">
+            <col style="width:120px;">
+            <col style="width:220px;">
+            <col style="width:120px;">
+            <col style="width:220px;">
+        </colgroup>
+        <tr>
+            <td class="module-label">我方文号</td>
+            <td><input type="text" name="case_code" class="module-input" value="<?= h($trademark_info['case_code']) ?>" readonly></td>
+            <td class="module-label module-req">*商标名称</td>
+            <td><input type="text" name="case_name" class="module-input" value="<?= h($trademark_info['case_name']) ?>" required></td>
+            <td class="module-label">商标图片</td>
+            <td>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div id="image-preview" style="width:80px;height:80px;border:2px dashed #ddd;display:flex;align-items:center;justify-content:center;background:#f9f9f9;border-radius:4px;position:relative;">
+                        <?php if ($trademark_info['trademark_image_path']): ?>
+                            <img id="preview-img" src="<?= h($trademark_info['trademark_image_path']) ?>" style="width:100%;height:100%;object-fit:contain;border-radius:4px;">
+                        <?php else: ?>
+                            <span style="color:#999;font-size:12px;text-align:center;">暂无图片</span>
+                            <img id="preview-img" style="display:none;width:100%;height:100%;object-fit:contain;border-radius:4px;">
+                        <?php endif; ?>
                     </div>
-                </td>
-            </tr>
-            <tr>
-                <td class="module-label">英文名称</td>
-                <td><input type="text" name="case_name_en" class="module-input" value="<?= h($trademark_info['case_name_en']) ?>"></td>
-                <td class="module-label">其它名称</td>
-                <td><input type="text" name="other_name" class="module-input" value="<?= h($trademark_info['other_name']) ?>"></td>
-                <td class="module-label">是否主案</td>
-                <td>
-                    <label><input type="radio" name="is_main_case" value="1" <?= $trademark_info['is_main_case'] == 1 ? 'checked' : '' ?>>是</label>
-                    <label><input type="radio" name="is_main_case" value="0" <?= $trademark_info['is_main_case'] == 0 ? 'checked' : '' ?>>否</label>
-                </td>
-            </tr>
-            <tr>
-                <td class="module-label">申请号</td>
-                <td><input type="text" name="application_no" class="module-input" value="<?= h($trademark_info['application_no']) ?>"></td>
-                <td class="module-label">申请日</td>
-                <td><input type="date" name="application_date" class="module-input" value="<?= h($trademark_info['application_date']) ?>"></td>
-                <td class="module-label">注册公告日</td>
-                <td><input type="date" name="registration_publication_date" class="module-input" value="<?= h($trademark_info['registration_publication_date']) ?>"></td>
-            </tr>
-            <tr>
-                <td class="module-label module-req">*承办部门</td>
-                <td>
-                    <?php render_select_search('business_dept_id', $departments_options, $trademark_info['business_dept_id']); ?>
-                </td>
-                <td class="module-label">业务人员</td>
-                <td>
-                    <?php render_select_search_multi('business_user_ids', $users_options, $trademark_info['business_user_ids']); ?>
-                </td>
-                <td class="module-label">注册公告期</td>
-                <td><input type="text" name="registration_publication_period" class="module-input" value="<?= h($trademark_info['registration_publication_period']) ?>"></td>
-            </tr>
-            <tr>
-                <td class="module-label">商标类别</td>
-                <td>
-                    <?php render_select_search_multi('trademark_class', $trademark_classes_options, $trademark_info['trademark_class']); ?>
-                </td>
-                <td class="module-label">业务助理</td>
-                <td>
-                    <?php render_select_search_multi('business_assistant_ids', $users_options, $trademark_info['business_assistant_ids']); ?>
-                </td>
-                <td class="module-label">客户状态</td>
-                <td>
-                    <?php echo render_select('client_status', $client_statuses, $trademark_info['client_status']); ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="module-label">初审公告日</td>
-                <td><input type="date" name="initial_publication_date" class="module-input" value="<?= h($trademark_info['initial_publication_date']) ?>"></td>
-                <td class="module-label">商标种类</td>
-                <td>
-                    <?php echo render_select('trademark_type', $trademark_types, $trademark_info['trademark_type']); ?>
-                </td>
-                <td class="module-label">续展日</td>
-                <td><input type="date" name="renewal_date" class="module-input" value="<?= h($trademark_info['renewal_date']) ?>"></td>
-            </tr>
-            <tr>
-                <td class="module-label">初审公告期</td>
-                <td><input type="text" name="initial_publication_period" class="module-input" value="<?= h($trademark_info['initial_publication_period']) ?>"></td>
-                <td class="module-label">初审公告号</td>
-                <td><input type="text" name="initial_publication_no" class="module-input" value="<?= h($trademark_info['initial_publication_no']) ?>"></td>
-                <td class="module-label">终止日</td>
-                <td><input type="date" name="expire_date" class="module-input" value="<?= h($trademark_info['expire_date']) ?>"></td>
-            </tr>
-            <tr>
-                <td class="module-label module-req">*客户名称</td>
-                <td>
-                    <?php render_select_search('client_id', $customers_options, $trademark_info['client_id']); ?>
-                </td>
-                <td class="module-label">注册号</td>
-                <td><input type="text" name="registration_no" class="module-input" value="<?= h($trademark_info['registration_no']) ?>"></td>
-                <td class="module-label"></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td class="module-label">客户文号</td>
-                <td><input type="text" name="client_case_code" class="module-input" value="<?= h($trademark_info['client_case_code']) ?>"></td>
-                <td class="module-label">国家(地区)</td>
-                <td>
-                    <?php echo render_select('country', $countries, $trademark_info['country']); ?>
-                </td>
-                <td class="module-label"></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td class="module-label">案件类型</td>
-                <td>
-                    <?php echo render_select('case_type', $case_types, $trademark_info['case_type']); ?>
-                </td>
-                <td class="module-label">案件流向</td>
-                <td>
-                    <?php echo render_select('case_flow', $case_flows, $trademark_info['case_flow']); ?>
-                </td>
-                <td class="module-label"></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td class="module-label">业务类型</td>
-                <td>
-                    <?php render_select_search('business_type', $business_types_options, $trademark_info['business_type']); ?>
-                </td>
-                <td class="module-label">申请方式</td>
-                <td>
-                    <?php echo render_select('application_mode', $application_modes, $trademark_info['application_mode']); ?>
-                </td>
-                <td class="module-label"></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td class="module-label">委案日期</td>
-                <td><input type="date" name="entrust_date" class="module-input" value="<?= h($trademark_info['entrust_date']) ?>"></td>
-                <td class="module-label">开卷日期</td>
-                <td><input type="date" name="open_date" class="module-input" value="<?= h($trademark_info['open_date']) ?>"></td>
-                <td class="module-label"></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td class="module-label">案件状态</td>
-                <td>
-                    <?php echo render_select('case_status', $case_statuses, $trademark_info['case_status']); ?>
-                </td>
-                <td class="module-label">获批日</td>
-                <td><input type="date" name="approval_date" class="module-input" value="<?= h($trademark_info['approval_date']) ?>"></td>
-                <td class="module-label"></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td class="module-label">处理事项</td>
-                <td>
-                    <?php render_select_search('process_item', $process_items_options, $trademark_info['process_item']); ?>
-                </td>
-                <td class="module-label">备注</td>
-                <td><textarea name="remarks" class="module-textarea" rows="2"><?= h($trademark_info['remarks']) ?></textarea></td>
-                <td class="module-label"></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td class="module-label">案源国</td>
-                <td>
-                    <?php echo render_select('source_country', $source_countries, $trademark_info['source_country']); ?>
-                </td>
-                <td class="module-label"></td>
-                <td></td>
-                <td class="module-label"></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td class="module-label">商标说明</td>
-                <td colspan="5"><textarea name="trademark_description" class="module-textarea" rows="3" style="width:100%;"><?= h($trademark_info['trademark_description']) ?></textarea></td>
-            </tr>
-        </table>
-    </form>
+                    <div>
+                        <input type="file" id="trademark-image" name="trademark_image" accept="image/*" style="display:none;">
+                        <button type="button" id="upload-btn" class="btn-mini" style="background:#29b6b0;color:#fff;border:none;padding:6px 12px;">上传</button>
+                        <button type="button" id="remove-btn" class="btn-mini" style="<?= $trademark_info['trademark_image_path'] ? '' : 'display:none;' ?>margin-left:5px;">删除</button>
+                        <div style="font-size:12px;color:#666;margin-top:5px;">支持JPG、PNG、GIF<br>最大5MB</div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td class="module-label">英文名称</td>
+            <td><input type="text" name="case_name_en" class="module-input" value="<?= h($trademark_info['case_name_en']) ?>"></td>
+            <td class="module-label">其它名称</td>
+            <td><input type="text" name="other_name" class="module-input" value="<?= h($trademark_info['other_name']) ?>"></td>
+            <td class="module-label">是否主案</td>
+            <td>
+                <label><input type="radio" name="is_main_case" value="1" <?= $trademark_info['is_main_case'] == 1 ? 'checked' : '' ?>>是</label>
+                <label><input type="radio" name="is_main_case" value="0" <?= $trademark_info['is_main_case'] == 0 ? 'checked' : '' ?>>否</label>
+            </td>
+        </tr>
+        <tr>
+            <td class="module-label">申请号</td>
+            <td><input type="text" name="application_no" class="module-input" value="<?= h($trademark_info['application_no']) ?>"></td>
+            <td class="module-label">申请日</td>
+            <td><input type="date" name="application_date" class="module-input" value="<?= h($trademark_info['application_date']) ?>"></td>
+            <td class="module-label">注册公告日</td>
+            <td><input type="date" name="registration_publication_date" class="module-input" value="<?= h($trademark_info['registration_publication_date']) ?>"></td>
+        </tr>
+        <tr>
+            <td class="module-label module-req">*承办部门</td>
+            <td>
+                <?php render_select_search('business_dept_id', $departments_options, $trademark_info['business_dept_id']); ?>
+            </td>
+            <td class="module-label">业务人员</td>
+            <td>
+                <?php render_select_search_multi('business_user_ids', $users_options, $trademark_info['business_user_ids']); ?>
+            </td>
+            <td class="module-label">注册公告期</td>
+            <td><input type="text" name="registration_publication_period" class="module-input" value="<?= h($trademark_info['registration_publication_period']) ?>"></td>
+        </tr>
+        <tr>
+            <td class="module-label">商标类别</td>
+            <td>
+                <?php render_select_search_multi('trademark_class', $trademark_classes_options, $trademark_info['trademark_class']); ?>
+            </td>
+            <td class="module-label">业务助理</td>
+            <td>
+                <?php render_select_search_multi('business_assistant_ids', $users_options, $trademark_info['business_assistant_ids']); ?>
+            </td>
+            <td class="module-label">客户状态</td>
+            <td>
+                <?php echo render_select('client_status', $client_statuses, $trademark_info['client_status']); ?>
+            </td>
+        </tr>
+        <tr>
+            <td class="module-label">初审公告日</td>
+            <td><input type="date" name="initial_publication_date" class="module-input" value="<?= h($trademark_info['initial_publication_date']) ?>"></td>
+            <td class="module-label">商标种类</td>
+            <td>
+                <?php echo render_select('trademark_type', $trademark_types, $trademark_info['trademark_type']); ?>
+            </td>
+            <td class="module-label">续展日</td>
+            <td><input type="date" name="renewal_date" class="module-input" value="<?= h($trademark_info['renewal_date']) ?>"></td>
+        </tr>
+        <tr>
+            <td class="module-label">初审公告期</td>
+            <td><input type="text" name="initial_publication_period" class="module-input" value="<?= h($trademark_info['initial_publication_period']) ?>"></td>
+            <td class="module-label">初审公告号</td>
+            <td><input type="text" name="initial_publication_no" class="module-input" value="<?= h($trademark_info['initial_publication_no']) ?>"></td>
+            <td class="module-label">终止日</td>
+            <td><input type="date" name="expire_date" class="module-input" value="<?= h($trademark_info['expire_date']) ?>"></td>
+        </tr>
+        <tr>
+            <td class="module-label module-req">*客户名称</td>
+            <td>
+                <?php render_select_search('client_id', $customers_options, $trademark_info['client_id']); ?>
+            </td>
+            <td class="module-label">注册号</td>
+            <td><input type="text" name="registration_no" class="module-input" value="<?= h($trademark_info['registration_no']) ?>"></td>
+            <td class="module-label"></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td class="module-label">客户文号</td>
+            <td><input type="text" name="client_case_code" class="module-input" value="<?= h($trademark_info['client_case_code']) ?>"></td>
+            <td class="module-label">国家(地区)</td>
+            <td>
+                <?php echo render_select('country', $countries, $trademark_info['country']); ?>
+            </td>
+            <td class="module-label"></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td class="module-label">案件类型</td>
+            <td>
+                <?php echo render_select('case_type', $case_types, $trademark_info['case_type']); ?>
+            </td>
+            <td class="module-label">案件流向</td>
+            <td>
+                <?php echo render_select('case_flow', $case_flows, $trademark_info['case_flow']); ?>
+            </td>
+            <td class="module-label"></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td class="module-label">业务类型</td>
+            <td>
+                <?php render_select_search('business_type', $business_types_options, $trademark_info['business_type']); ?>
+            </td>
+            <td class="module-label">申请方式</td>
+            <td>
+                <?php echo render_select('application_mode', $application_modes, $trademark_info['application_mode']); ?>
+            </td>
+            <td class="module-label"></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td class="module-label">委案日期</td>
+            <td><input type="date" name="entrust_date" class="module-input" value="<?= h($trademark_info['entrust_date']) ?>"></td>
+            <td class="module-label">开卷日期</td>
+            <td><input type="date" name="open_date" class="module-input" value="<?= h($trademark_info['open_date']) ?>"></td>
+            <td class="module-label"></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td class="module-label">案件状态</td>
+            <td>
+                <?php echo render_select('case_status', $case_statuses, $trademark_info['case_status']); ?>
+            </td>
+            <td class="module-label">获批日</td>
+            <td><input type="date" name="approval_date" class="module-input" value="<?= h($trademark_info['approval_date']) ?>"></td>
+            <td class="module-label"></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td class="module-label">处理事项</td>
+            <td>
+                <?php render_select_search('process_item', $process_items_options, $trademark_info['process_item']); ?>
+            </td>
+            <td class="module-label">备注</td>
+            <td><textarea name="remarks" class="module-textarea" rows="2"><?= h($trademark_info['remarks']) ?></textarea></td>
+            <td class="module-label"></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td class="module-label">案源国</td>
+            <td>
+                <?php echo render_select('source_country', $source_countries, $trademark_info['source_country']); ?>
+            </td>
+            <td class="module-label"></td>
+            <td></td>
+            <td class="module-label"></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td class="module-label">商标说明</td>
+            <td colspan="5"><textarea name="trademark_description" class="module-textarea" rows="3" style="width:100%;"><?= h($trademark_info['trademark_description']) ?></textarea></td>
+        </tr>
+    </table>
+</form>
 <!-- </div> -->
 
 <script>
@@ -532,12 +564,48 @@ render_select_search_assets();
         // 删除图片
         if (removeBtn) {
             removeBtn.onclick = function() {
-                fileInput.value = '';
-                previewImg.style.display = 'none';
-                previewImg.src = '';
-                var span = imagePreview.querySelector('span');
-                if (span) span.style.display = 'block';
-                removeBtn.style.display = 'none';
+                // 检查是否有已保存的图片（从服务器加载的）
+                var hasServerImage = previewImg.src && !previewImg.src.startsWith('data:');
+
+                if (hasServerImage) {
+                    // 有服务器图片，需要确认删除
+                    if (confirm('确定要删除这张图片吗？删除后将无法恢复。')) {
+                        // 发送AJAX请求删除图片
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('POST', 'modules/trademark_management/edit_tabs/basic.php?trademark_id=<?= $trademark_id ?>', true);
+                        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState === 4) {
+                                try {
+                                    var res = JSON.parse(xhr.responseText);
+                                    if (res.success) {
+                                        // 删除成功，清空预览
+                                        fileInput.value = '';
+                                        previewImg.style.display = 'none';
+                                        previewImg.src = '';
+                                        var span = imagePreview.querySelector('span');
+                                        if (span) span.style.display = 'block';
+                                        removeBtn.style.display = 'none';
+                                        alert('图片删除成功');
+                                    } else {
+                                        alert(res.msg || '删除图片失败');
+                                    }
+                                } catch (e) {
+                                    alert('删除图片失败：' + xhr.responseText);
+                                }
+                            }
+                        };
+                        xhr.send('action=delete_image');
+                    }
+                } else {
+                    // 只是预览图片（未保存），直接清空
+                    fileInput.value = '';
+                    previewImg.style.display = 'none';
+                    previewImg.src = '';
+                    var span = imagePreview.querySelector('span');
+                    if (span) span.style.display = 'block';
+                    removeBtn.style.display = 'none';
+                }
             };
         }
 

@@ -5,6 +5,7 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
+include 'database.php';
 ?>
 <!DOCTYPE html>
 <html>
@@ -61,7 +62,7 @@ if (!isset($_SESSION['user_id'])) {
 
     <!-- 底部版权信息 -->
     <div class="footer">
-        Copyright© 2025 广州市鸿鼎知识产权信息有限公司 V1.1.0
+        Copyright© 2025 广州市鸿鼎知识产权信息有限公司 V<?php echo $version; ?>
         <!-- | <a href="#">选文常用文档</a> | <a href="#">快速开始</a> | <a href="#">工单提交</a> | <a href="#">更新日志</a> -->
     </div>
 

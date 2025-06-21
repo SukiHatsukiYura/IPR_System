@@ -2,6 +2,22 @@
 // 首页内容，仿照原系统布局
 ?>
 <div class="homepage-panel">
+    <!-- 功能更新通知 -->
+    <div class="panel collapsible-panel">
+        <div class="panel-header collapsible-header" data-target="update-content">
+            <span class="collapse-arrow">&#9660;</span>
+            <h3 class="panel-title"><i class="icon-notification"></i> 功能更新通知</h3>
+        </div>
+        <div class="panel-content collapsible-content" id="update-content">
+            <div class="update-notification">
+                <div class="update-item">
+                    <span class="update-badge new">NEW</span>
+                    <span class="update-text">批量导入功能已开放：客户列表、专利查询、商标查询、版权查询现已支持Excel批量导入功能，可大幅提升数据录入效率。</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 已开放功能 -->
     <div class="panel collapsible-panel">
         <div class="panel-header collapsible-header" data-target="features-content">
@@ -85,6 +101,8 @@
             </div>
         </div>
     </div>
+
+
 
     <!-- 待办事项 -->
     <div class="panel collapsible-panel">
@@ -274,6 +292,55 @@
 
     .blue {
         background: #2196f3;
+    }
+
+    /* 功能更新通知样式 */
+    .update-notification {
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 16px;
+    }
+
+    .update-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        line-height: 1.6;
+    }
+
+    .update-badge {
+        background: #29b6b0;
+        color: #fff;
+        font-size: 12px;
+        font-weight: bold;
+        padding: 3px 8px;
+        border-radius: 12px;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .update-badge.new {
+        background: #4caf50;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.7;
+        }
+
+        100% {
+            opacity: 1;
+        }
+    }
+
+    .update-text {
+        color: #333;
+        font-size: 17px;
     }
 
     /* 已开放功能样式 */
