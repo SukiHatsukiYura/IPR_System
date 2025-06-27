@@ -71,6 +71,7 @@ $headers = [
     'initial_publication_date' => '初审公告日(YYYY-MM-DD)',
     'initial_publication_period' => '初审公告期',
     'client_id' => '客户ID*',
+    'client_name' => '客户名称(中)*',
     'case_type' => '案件类型',
     'business_type' => '业务类型',
     'entrust_date' => '委案日期(YYYY-MM-DD)',
@@ -220,6 +221,7 @@ $tips = [
     '5、商标类别可多选，用逗号分隔（如：1(化工原料),2(颜料油漆)）',
     '6、是否主案字段：1表示是，0表示否，默认为0',
     '7、商标图片需要导入后在编辑页面单独上传',
+    '8、客户ID和客户名称(中)必须至少填写一个，优先使用客户ID，如果客户不存在会自动创建',
 ];
 
 // 将提示信息两两组合在一行中显示
@@ -274,6 +276,18 @@ foreach ($relatedData['customers'] as $customer) {
 }
 $customer_info = rtrim($customer_info, '，');
 echo '<Data ss:Type="String">' . $customer_info . '</Data>' . "\n";
+echo '</Cell>' . "\n";
+echo '</Row>' . "\n";
+
+// 客户名称参考信息
+echo '<Row ss:Height="30">' . "\n";
+echo '<Cell ss:MergeAcross="' . ($column_count - 1) . '" ss:StyleID="InfoStyle">' . "\n";
+$customer_name_info = '客户名称参考：';
+foreach ($relatedData['customers'] as $customer) {
+    $customer_name_info .= htmlspecialchars($customer['customer_name_cn']) . '，';
+}
+$customer_name_info = rtrim($customer_name_info, '，');
+echo '<Data ss:Type="String">' . $customer_name_info . '</Data>' . "\n";
 echo '</Cell>' . "\n";
 echo '</Row>' . "\n";
 

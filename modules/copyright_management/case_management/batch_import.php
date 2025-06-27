@@ -163,20 +163,104 @@ function parseExcelXml($xml_content)
 {
     $data = [];
 
-    // 使用简单的正则表达式解析XML，避免DOMDocument依赖
-    // 匹配所有Row元素
-    if (preg_match_all('/<Row[^>]*>(.*?)<\/Row>/s', $xml_content, $row_matches)) {
-        foreach ($row_matches[1] as $row_content) {
-            // 匹配Row中的所有Cell元素
-            if (preg_match_all('/<Cell[^>]*>.*?<Data[^>]*>(.*?)<\/Data>.*?<\/Cell>/s', $row_content, $cell_matches)) {
+    // 使用DOMDocument进行更准确的XML解析
+    if (class_exists('DOMDocument')) {
+        try {
+            $dom = new DOMDocument();
+            @$dom->loadXML($xml_content); // 使用@抑制XML格式警告
+
+            $rows = $dom->getElementsByTagName('Row');
+            foreach ($rows as $row) {
                 $row_data = [];
-                foreach ($cell_matches[1] as $cell_value) {
-                    // 解码HTML实体
-                    $row_data[] = html_entity_decode(trim($cell_value), ENT_QUOTES, 'UTF-8');
+                $cells = $row->childNodes;
+
+                $current_col = 0;
+                foreach ($cells as $node) {
+                    if ($node->nodeType !== XML_ELEMENT_NODE || $node->nodeName !== 'Cell') {
+                        continue;
+                    }
+
+                    // 确保$node是DOMElement类型
+                    if (!($node instanceof DOMElement)) {
+                        continue;
+                    }
+
+                    $cell = $node; // 现在$cell确定是DOMElement类型
+
+                    // 检查Cell是否有Index属性，如果有则可能跳过了一些列
+                    $index_attr = $cell->getAttribute('ss:Index');
+                    if ($index_attr) {
+                        $target_col = intval($index_attr) - 1; // Excel索引从1开始，数组从0开始
+                        // 填充跳过的列
+                        while ($current_col < $target_col) {
+                            $row_data[] = '';
+                            $current_col++;
+                        }
+                    }
+
+                    // 获取Data元素的内容
+                    $data_elements = $cell->getElementsByTagName('Data');
+                    if ($data_elements->length > 0) {
+                        $row_data[] = trim($data_elements->item(0)->nodeValue);
+                    } else {
+                        $row_data[] = '';
+                    }
+                    $current_col++;
                 }
+
                 if (!empty($row_data)) {
                     $data[] = $row_data;
                 }
+            }
+        } catch (Exception $e) {
+            // DOMDocument解析失败，使用正则表达式备用方案
+            error_log("DOMDocument解析失败: " . $e->getMessage());
+            $data = parseExcelXmlRegex($xml_content);
+        }
+    } else {
+        // DOMDocument不可用，使用正则表达式
+        $data = parseExcelXmlRegex($xml_content);
+    }
+
+    return $data;
+}
+
+/**
+ * 使用正则表达式解析Excel XML的备用方案
+ */
+function parseExcelXmlRegex($xml_content)
+{
+    $data = [];
+
+    if (preg_match_all('/<Row[^>]*>(.*?)<\/Row>/s', $xml_content, $row_matches)) {
+        foreach ($row_matches[1] as $row_content) {
+            $row_data = [];
+
+            // 更精确地匹配Cell元素
+            if (preg_match_all('/<Cell[^>]*?(?:ss:Index="(\d+)"[^>]*)?(?:\/>|>(.*?)<\/Cell>)/s', $row_content, $cell_matches, PREG_SET_ORDER)) {
+                $current_col = 0;
+
+                foreach ($cell_matches as $match) {
+                    $index = isset($match[1]) && $match[1] ? intval($match[1]) - 1 : $current_col;
+
+                    // 填充跳过的列
+                    while ($current_col < $index) {
+                        $row_data[] = '';
+                        $current_col++;
+                    }
+
+                    $cell_content = isset($match[2]) ? $match[2] : '';
+                    if (preg_match('/<Data[^>]*>(.*?)<\/Data>/s', $cell_content, $data_matches)) {
+                        $row_data[] = html_entity_decode(trim($data_matches[1]), ENT_QUOTES, 'UTF-8');
+                    } else {
+                        $row_data[] = '';
+                    }
+                    $current_col++;
+                }
+            }
+
+            if (!empty($row_data)) {
+                $data[] = $row_data;
             }
         }
     }
@@ -198,6 +282,8 @@ function getHeaderMapping($headers)
         '案件类型' => 'case_type',
         '客户文号' => 'client_case_code',
         '客户ID' => 'client_id',
+        '客户名称' => 'client_name',
+        '客户名称(中)' => 'client_name',
         '业务类型' => 'business_type',
         '处理事项' => 'process_item',
         '案件状态' => 'case_status',
@@ -210,7 +296,7 @@ function getHeaderMapping($headers)
         '国家(地区)' => 'country',
         '案件流向' => 'case_flow',
         '案源国' => 'source_country',
-        '开卷日期' => 'open_date',
+        '开卷日' => 'open_date',
         '受理号' => 'application_no',
         '受理日' => 'application_date',
         '登记号' => 'registration_no',
@@ -279,12 +365,12 @@ function batchImportCopyrights($pdo, $rows, $header_map, $user_id)
                 error_log("第{$line_number}行原始数据: " . json_encode($row, JSON_UNESCAPED_UNICODE));
 
                 // 解析行数据
-                $data = parseCopyrightRow($row, $header_map, $departments, $customers, $users);
+                $data = parseCopyrightRow($pdo, $row, $header_map, $departments, $customers, $users);
 
                 // 调试信息：记录解析后的数据
                 error_log("第{$line_number}行解析后数据: " . json_encode($data, JSON_UNESCAPED_UNICODE));
 
-                // 验证数据
+                // 验证必填字段
                 $validation_result = validateCopyrightData($data, $line_number);
                 if (!$validation_result['valid']) {
                     $errors[] = "第{$line_number}行: " . $validation_result['message'];
@@ -293,11 +379,25 @@ function batchImportCopyrights($pdo, $rows, $header_map, $user_id)
                     continue;
                 }
 
-                // 检查是否已存在相同案件
-                if (!empty($data['case_code']) && checkExistingCase($pdo, $data['case_code'])) {
-                    $errors[] = "第{$line_number}行: 我方文号 '{$data['case_code']}' 已存在";
-                    $error_count++;
-                    continue;
+                // 如果用户填写了客户ID，验证客户ID是否存在
+                if (isset($data['client_id']) && !empty($data['client_id']) && is_numeric($data['client_id'])) {
+                    $stmt = $pdo->prepare("SELECT id FROM customer WHERE id = ?");
+                    $stmt->execute([$data['client_id']]);
+                    if (!$stmt->fetch()) {
+                        $errors[] = "第{$line_number}行: 客户ID {$data['client_id']} 不存在，请填写有效的客户ID";
+                        $error_count++;
+                        continue;
+                    }
+                }
+
+                // 检查是否存在重复案件编号（只在用户提供了案件编号时检查）
+                if (!empty($data['case_code'])) {
+                    $existing_id = checkExistingCase($pdo, $data['case_code']);
+                    if ($existing_id) {
+                        $errors[] = "第{$line_number}行: 案件编号 {$data['case_code']} 已存在";
+                        $error_count++;
+                        continue;
+                    }
                 }
 
                 // 插入版权案件
@@ -389,11 +489,40 @@ function getUserMap($pdo)
 }
 
 /**
- * 解析版权案件行数据
+ * 解析版权行数据
  */
-function parseCopyrightRow($row, $header_map, $departments, $customers, $users)
+function parseCopyrightRow($pdo, $row, $header_map, $departments, $customers, $users)
 {
-    $data = [];
+    $data = [
+        'case_code' => null,
+        'case_name' => null,
+        'case_type' => null,
+        'client_case_code' => null,
+        'client_id' => null,
+        'business_type' => null,
+        'process_item' => null,
+        'case_status' => null,
+        'entrust_date' => null,
+        'business_dept_id' => null,
+        'business_user_ids' => null,
+        'application_mode' => null,
+        'application_type' => null,
+        'country' => null,
+        'case_flow' => null,
+        'source_country' => null,
+        'open_date' => null,
+        'application_no' => null,
+        'application_date' => null,
+        'registration_no' => null,
+        'registration_date' => null,
+        'certificate_no' => null,
+        'expire_date' => null,
+        'start_stage' => null,
+        'is_expedited' => null,
+        'is_subsidy_agent' => 0,
+        'is_material_available' => 0,
+        'remarks' => null
+    ];
 
     foreach ($header_map as $col_index => $field_name) {
         $value = isset($row[$col_index]) ? trim($row[$col_index]) : '';
@@ -404,11 +533,11 @@ function parseCopyrightRow($row, $header_map, $departments, $customers, $users)
                 break;
 
             case 'case_name':
-                $data['case_name'] = $value;
+                $data['case_name'] = !empty($value) ? $value : null;
                 break;
 
             case 'case_type':
-                $data['case_type'] = !empty($value) ? $value : '版权';
+                $data['case_type'] = !empty($value) ? $value : null;
                 break;
 
             case 'client_case_code':
@@ -416,12 +545,13 @@ function parseCopyrightRow($row, $header_map, $departments, $customers, $users)
                 break;
 
             case 'client_id':
-                if (is_numeric($value)) {
-                    $data['client_id'] = intval($value);
-                } elseif (!empty($value) && isset($customers[$value])) {
-                    $data['client_id'] = $customers[$value];
-                } else {
-                    $data['client_id'] = null;
+                $data['client_id'] = !empty($value) && is_numeric($value) ? intval($value) : null;
+                break;
+
+            case 'client_name':
+                // 支持客户名称，如果不存在则自动创建
+                if (!empty($value)) {
+                    $data['client_id_from_name'] = getOrCreateCustomer($pdo, $value);
                 }
                 break;
 
@@ -438,146 +568,135 @@ function parseCopyrightRow($row, $header_map, $departments, $customers, $users)
                 break;
 
             case 'entrust_date':
-                $data['entrust_date'] = !empty($value) && $value !== '0000-00-00' ? $value : null;
-                break;
+            case 'open_date':
+            case 'application_date':
+            case 'registration_date':
+            case 'expire_date':
+                if (!empty($value)) {
+                    // 尝试多种日期格式
+                    $date_formats = ['Y-m-d', 'Y/m/d', 'm/d/Y', 'd/m/Y', 'Y-m-d H:i:s'];
+                    $parsed_date = null;
 
-            case 'business_dept_id':
-                if (is_numeric($value)) {
-                    $data['business_dept_id'] = intval($value);
-                } elseif (!empty($value) && isset($departments[$value])) {
-                    $data['business_dept_id'] = $departments[$value];
+                    foreach ($date_formats as $format) {
+                        $date_obj = DateTime::createFromFormat($format, $value);
+                        if ($date_obj !== false) {
+                            $parsed_date = $date_obj->format('Y-m-d');
+                            break;
+                        }
+                    }
+
+                    // 如果格式化失败，尝试strtotime
+                    if ($parsed_date === null) {
+                        $timestamp = strtotime($value);
+                        if ($timestamp !== false) {
+                            $parsed_date = date('Y-m-d', $timestamp);
+                        }
+                    }
+
+                    $data[$field_name] = $parsed_date;
                 } else {
-                    $data['business_dept_id'] = null;
+                    $data[$field_name] = null;
                 }
                 break;
 
+            case 'business_dept_id':
+                $data['business_dept_id'] = !empty($value) && is_numeric($value) ? intval($value) : null;
+                break;
+
             case 'business_user_ids':
+                // 处理多个ID（逗号分隔）
                 if (!empty($value)) {
-                    $user_ids = [];
-                    $user_parts = explode(',', $value);
-                    foreach ($user_parts as $part) {
-                        $part = trim($part);
-                        if (is_numeric($part)) {
-                            $user_ids[] = intval($part);
-                        } elseif (isset($users[$part])) {
-                            $user_ids[] = $users[$part];
+                    $ids = array_map('trim', explode(',', $value));
+                    $valid_ids = [];
+                    foreach ($ids as $id) {
+                        if (is_numeric($id)) {
+                            $valid_ids[] = intval($id);
                         }
                     }
-                    $data['business_user_ids'] = !empty($user_ids) ? implode(',', $user_ids) : null;
+                    $data['business_user_ids'] = !empty($valid_ids) ? implode(',', $valid_ids) : null;
                 } else {
                     $data['business_user_ids'] = null;
                 }
                 break;
 
-            case 'application_mode':
-                $data['application_mode'] = !empty($value) ? $value : null;
-                break;
-
-            case 'application_type':
-                $data['application_type'] = !empty($value) ? $value : null;
-                break;
-
-            case 'country':
-                $data['country'] = !empty($value) ? $value : null;
-                break;
-
-            case 'case_flow':
-                $data['case_flow'] = !empty($value) ? $value : null;
-                break;
-
-            case 'source_country':
-                $data['source_country'] = !empty($value) ? $value : null;
-                break;
-
-            case 'open_date':
-                $data['open_date'] = !empty($value) && $value !== '0000-00-00' ? $value : null;
-                break;
-
-            case 'application_no':
-                $data['application_no'] = !empty($value) ? $value : null;
-                break;
-
-            case 'application_date':
-                $data['application_date'] = !empty($value) && $value !== '0000-00-00' ? $value : null;
-                break;
-
-            case 'registration_no':
-                $data['registration_no'] = !empty($value) ? $value : null;
-                break;
-
-            case 'registration_date':
-                $data['registration_date'] = !empty($value) && $value !== '0000-00-00' ? $value : null;
-                break;
-
-            case 'certificate_no':
-                $data['certificate_no'] = !empty($value) ? $value : null;
-                break;
-
-            case 'expire_date':
-                $data['expire_date'] = !empty($value) && $value !== '0000-00-00' ? $value : null;
-                break;
-
-            case 'start_stage':
-                $data['start_stage'] = !empty($value) ? $value : null;
-                break;
-
-            case 'is_expedited':
-                $data['is_expedited'] = !empty($value) ? $value : null;
-                break;
-
             case 'is_subsidy_agent':
-                $data['is_subsidy_agent'] = ($value === '1' || $value === 1) ? 1 : 0;
-                break;
-
             case 'is_material_available':
-                $data['is_material_available'] = ($value === '1' || $value === 1) ? 1 : 0;
+                if (is_numeric($value)) {
+                    $data[$field_name] = intval($value);
+                } else {
+                    $data[$field_name] = ($value === '是' || $value === '有') ? 1 : 0;
+                }
                 break;
 
-            case 'remarks':
-                $data['remarks'] = !empty($value) ? $value : null;
+            default:
+                // 对于文本字段，确保不会将空字符串当作有效值
+                $data[$field_name] = !empty($value) ? $value : null;
                 break;
         }
+    }
+
+    // 处理客户ID的优先级：如果同时有client_id和client_id_from_name，优先使用用户直接填写的client_id
+    if (isset($data['client_id']) && !empty($data['client_id'])) {
+        // 用户填写了客户ID，使用客户ID
+        unset($data['client_id_from_name']);
+    } elseif (isset($data['client_id_from_name'])) {
+        // 用户没填客户ID但填了客户名称，使用从客户名称获取的ID
+        $data['client_id'] = $data['client_id_from_name'];
+        unset($data['client_id_from_name']);
     }
 
     return $data;
 }
 
 /**
- * 验证版权案件数据
+ * 验证版权数据
  */
 function validateCopyrightData($data, $line_number)
 {
-    $errors = [];
+    // 根据版权案件的必填字段验证
+    $required_fields = [
+        'case_name' => '案件名称',
+        'business_dept_id' => '承办部门ID',
+        'process_item' => '处理事项'
+    ];
 
-    // 必填字段验证
-    if (empty($data['case_name'])) {
-        $errors[] = '案件名称不能为空';
-    }
-
-    if (empty($data['client_id'])) {
-        $errors[] = '客户ID不能为空';
-    }
-
-    if (empty($data['process_item'])) {
-        $errors[] = '处理事项不能为空';
-    }
-
-    if (empty($data['business_dept_id'])) {
-        $errors[] = '承办部门ID不能为空';
-    }
-
-    // 日期格式验证
-    $date_fields = ['entrust_date', 'open_date', 'application_date', 'registration_date', 'expire_date'];
-    foreach ($date_fields as $field) {
-        if (!empty($data[$field]) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data[$field])) {
-            $errors[] = "{$field}日期格式错误，应为YYYY-MM-DD";
+    foreach ($required_fields as $field => $label) {
+        if (empty($data[$field]) || $data[$field] === null || trim($data[$field]) === '') {
+            return [
+                'valid' => false,
+                'message' => "必填字段 {$label} 不能为空（当前值：'" . ($data[$field] ?? 'null') . "'）"
+            ];
         }
     }
 
-    return [
-        'valid' => empty($errors),
-        'message' => implode('; ', $errors)
-    ];
+    // 特殊验证：客户ID和客户名称必须至少填写一个
+    if (empty($data['client_id']) || $data['client_id'] === null) {
+        return [
+            'valid' => false,
+            'message' => "客户ID和客户名称(中)必须至少填写一个"
+        ];
+    }
+
+    // 验证案件编号格式（如果提供了的话）
+    if (!empty($data['case_code']) && !preg_match('/^[A-Za-z0-9\-_]+$/', $data['case_code'])) {
+        return [
+            'valid' => false,
+            'message' => '案件编号格式不正确'
+        ];
+    }
+
+    // 验证数值字段
+    $numeric_fields = ['business_dept_id', 'client_id'];
+    foreach ($numeric_fields as $field) {
+        if (!empty($data[$field]) && !is_numeric($data[$field])) {
+            return [
+                'valid' => false,
+                'message' => "字段 {$field} 必须是数字"
+            ];
+        }
+    }
+
+    return ['valid' => true];
 }
 
 /**
@@ -665,6 +784,56 @@ function generateCaseCode($pdo)
 {
     $prefix = 'CR' . date('Ymd');
     $sql = "SELECT COUNT(*) FROM copyright_case_info WHERE case_code LIKE :prefix";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([':prefix' => $prefix . '%']);
+    $count = $stmt->fetchColumn();
+    $serial = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+    return $prefix . $serial;
+}
+
+/**
+ * 根据客户名称获取或创建客户
+ */
+function getOrCreateCustomer($pdo, $customer_name)
+{
+    if (empty($customer_name)) {
+        return null;
+    }
+
+    // 首先检查客户是否已存在
+    $stmt = $pdo->prepare("SELECT id FROM customer WHERE customer_name_cn = ?");
+    $stmt->execute([$customer_name]);
+    $existing_customer = $stmt->fetch();
+
+    if ($existing_customer) {
+        return $existing_customer['id'];
+    }
+
+    // 客户不存在，创建新客户
+    try {
+        // 生成客户编号
+        $customer_code = generateCustomerCode($pdo);
+
+        $stmt = $pdo->prepare("INSERT INTO customer (customer_code, customer_name_cn, created_at) VALUES (?, ?, NOW())");
+        $stmt->execute([$customer_code, $customer_name]);
+
+        $new_customer_id = $pdo->lastInsertId();
+        error_log("自动创建新客户: ID={$new_customer_id}, 名称={$customer_name}, 编号={$customer_code}");
+
+        return $new_customer_id;
+    } catch (Exception $e) {
+        error_log("创建客户失败: " . $e->getMessage());
+        throw new Exception("创建客户失败: " . $e->getMessage());
+    }
+}
+
+/**
+ * 生成客户编号
+ */
+function generateCustomerCode($pdo)
+{
+    $prefix = 'KH' . date('Ymd');
+    $sql = "SELECT COUNT(*) FROM customer WHERE customer_code LIKE :prefix";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':prefix' => $prefix . '%']);
     $count = $stmt->fetchColumn();

@@ -160,20 +160,104 @@ function parseExcelXml($xml_content)
 {
     $data = [];
 
-    // 使用简单的正则表达式解析XML，避免DOMDocument依赖
-    // 匹配所有Row元素
-    if (preg_match_all('/<Row[^>]*>(.*?)<\/Row>/s', $xml_content, $row_matches)) {
-        foreach ($row_matches[1] as $row_content) {
-            // 匹配Row中的所有Cell元素
-            if (preg_match_all('/<Cell[^>]*>.*?<Data[^>]*>(.*?)<\/Data>.*?<\/Cell>/s', $row_content, $cell_matches)) {
+    // 使用DOMDocument进行更准确的XML解析
+    if (class_exists('DOMDocument')) {
+        try {
+            $dom = new DOMDocument();
+            @$dom->loadXML($xml_content); // 使用@抑制XML格式警告
+
+            $rows = $dom->getElementsByTagName('Row');
+            foreach ($rows as $row) {
                 $row_data = [];
-                foreach ($cell_matches[1] as $cell_value) {
-                    // 解码HTML实体
-                    $row_data[] = html_entity_decode(trim($cell_value), ENT_QUOTES, 'UTF-8');
+                $cells = $row->childNodes;
+
+                $current_col = 0;
+                foreach ($cells as $node) {
+                    if ($node->nodeType !== XML_ELEMENT_NODE || $node->nodeName !== 'Cell') {
+                        continue;
+                    }
+
+                    // 确保$node是DOMElement类型
+                    if (!($node instanceof DOMElement)) {
+                        continue;
+                    }
+
+                    $cell = $node; // 现在$cell确定是DOMElement类型
+
+                    // 检查Cell是否有Index属性，如果有则可能跳过了一些列
+                    $index_attr = $cell->getAttribute('ss:Index');
+                    if ($index_attr) {
+                        $target_col = intval($index_attr) - 1; // Excel索引从1开始，数组从0开始
+                        // 填充跳过的列
+                        while ($current_col < $target_col) {
+                            $row_data[] = '';
+                            $current_col++;
+                        }
+                    }
+
+                    // 获取Data元素的内容
+                    $data_elements = $cell->getElementsByTagName('Data');
+                    if ($data_elements->length > 0) {
+                        $row_data[] = trim($data_elements->item(0)->nodeValue);
+                    } else {
+                        $row_data[] = '';
+                    }
+                    $current_col++;
                 }
+
                 if (!empty($row_data)) {
                     $data[] = $row_data;
                 }
+            }
+        } catch (Exception $e) {
+            // DOMDocument解析失败，使用正则表达式备用方案
+            error_log("DOMDocument解析失败: " . $e->getMessage());
+            $data = parseExcelXmlRegex($xml_content);
+        }
+    } else {
+        // DOMDocument不可用，使用正则表达式
+        $data = parseExcelXmlRegex($xml_content);
+    }
+
+    return $data;
+}
+
+/**
+ * 使用正则表达式解析Excel XML的备用方案
+ */
+function parseExcelXmlRegex($xml_content)
+{
+    $data = [];
+
+    if (preg_match_all('/<Row[^>]*>(.*?)<\/Row>/s', $xml_content, $row_matches)) {
+        foreach ($row_matches[1] as $row_content) {
+            $row_data = [];
+
+            // 更精确地匹配Cell元素
+            if (preg_match_all('/<Cell[^>]*?(?:ss:Index="(\d+)"[^>]*)?(?:\/>|>(.*?)<\/Cell>)/s', $row_content, $cell_matches, PREG_SET_ORDER)) {
+                $current_col = 0;
+
+                foreach ($cell_matches as $match) {
+                    $index = isset($match[1]) && $match[1] ? intval($match[1]) - 1 : $current_col;
+
+                    // 填充跳过的列
+                    while ($current_col < $index) {
+                        $row_data[] = '';
+                        $current_col++;
+                    }
+
+                    $cell_content = isset($match[2]) ? $match[2] : '';
+                    if (preg_match('/<Data[^>]*>(.*?)<\/Data>/s', $cell_content, $data_matches)) {
+                        $row_data[] = html_entity_decode(trim($data_matches[1]), ENT_QUOTES, 'UTF-8');
+                    } else {
+                        $row_data[] = '';
+                    }
+                    $current_col++;
+                }
+            }
+
+            if (!empty($row_data)) {
+                $data[] = $row_data;
             }
         }
     }
@@ -199,6 +283,7 @@ function getHeaderMapping($headers)
         '客户文号' => 'client_case_code',
         '处理事项' => 'process_item',
         '客户名称' => 'client_name', // 向后兼容
+        '客户名称(中)' => 'client_name', // 新格式：客户名称
         '客户ID' => 'client_id', // 新格式
         '业务类型' => 'business_type',
         '委案日期' => 'entrust_date',
@@ -290,7 +375,7 @@ function batchImportPatents($pdo, $rows, $header_map, $user_id)
                 error_log("第{$line_number}行原始数据: " . json_encode($row, JSON_UNESCAPED_UNICODE));
 
                 // 解析行数据
-                $patent_data = parsePatentRow($row, $header_map, $departments, $customers, $users);
+                $patent_data = parsePatentRow($pdo, $row, $header_map, $departments, $customers, $users);
 
                 // 调试信息：记录解析后的数据
                 error_log("第{$line_number}行解析后数据: " . json_encode($patent_data, JSON_UNESCAPED_UNICODE));
@@ -302,6 +387,17 @@ function batchImportPatents($pdo, $rows, $header_map, $user_id)
                     $error_count++;
                     error_log("第{$line_number}行验证失败: " . $validation_result['message']);
                     continue;
+                }
+
+                // 如果用户填写了客户ID，验证客户ID是否存在
+                if (isset($patent_data['client_id']) && !empty($patent_data['client_id']) && is_numeric($patent_data['client_id'])) {
+                    $stmt = $pdo->prepare("SELECT id FROM customer WHERE id = ?");
+                    $stmt->execute([$patent_data['client_id']]);
+                    if (!$stmt->fetch()) {
+                        $errors[] = "第{$line_number}行: 客户ID {$patent_data['client_id']} 不存在，请填写有效的客户ID";
+                        $error_count++;
+                        continue;
+                    }
                 }
 
                 // 检查是否存在重复案件编号（只在用户提供了案件编号时检查）
@@ -386,7 +482,7 @@ function getUserMap($pdo)
 /**
  * 解析专利行数据
  */
-function parsePatentRow($row, $header_map, $departments, $customers, $users)
+function parsePatentRow($pdo, $row, $header_map, $departments, $customers, $users)
 {
     $data = [];
 
@@ -399,7 +495,10 @@ function parsePatentRow($row, $header_map, $departments, $customers, $users)
                 $data['business_dept_id'] = isset($departments[$value]) ? $departments[$value] : null;
                 break;
             case 'client_name':
-                $data['client_id'] = isset($customers[$value]) ? $customers[$value] : null;
+                // 支持客户名称，如果不存在则自动创建
+                if (!empty($value)) {
+                    $data['client_id_from_name'] = getOrCreateCustomer($pdo, $value);
+                }
                 break;
             case 'handler_name':
                 $data['handler_id'] = isset($users[$value]) ? $users[$value] : null;
@@ -510,6 +609,16 @@ function parsePatentRow($row, $header_map, $departments, $customers, $users)
         }
     }
 
+    // 处理客户ID的优先级：如果同时有client_id和client_id_from_name，优先使用用户直接填写的client_id
+    if (isset($data['client_id']) && !empty($data['client_id'])) {
+        // 用户填写了客户ID，使用客户ID
+        unset($data['client_id_from_name']);
+    } elseif (isset($data['client_id_from_name'])) {
+        // 用户没填客户ID但填了客户名称，使用从客户名称获取的ID
+        $data['client_id'] = $data['client_id_from_name'];
+        unset($data['client_id_from_name']);
+    }
+
     return $data;
 }
 
@@ -523,7 +632,6 @@ function validatePatentData($data, $line_number)
         'case_name' => '案件名称',
         'business_dept_id' => '承办部门ID',
         'process_item' => '处理事项',
-        'client_id' => '客户ID',
         'application_type' => '申请类型'
     ];
 
@@ -534,6 +642,14 @@ function validatePatentData($data, $line_number)
                 'message' => "必填字段 {$label} 不能为空（当前值：'" . ($data[$field] ?? 'null') . "'）"
             ];
         }
+    }
+
+    // 特殊验证：客户ID和客户名称必须至少填写一个
+    if (empty($data['client_id']) || $data['client_id'] === null) {
+        return [
+            'valid' => false,
+            'message' => "客户ID和客户名称(中)必须至少填写一个"
+        ];
     }
 
     // 验证案件编号格式（如果提供了的话）
@@ -589,8 +705,6 @@ function insertPatentCase($pdo, $data, $user_id)
     return $pdo->lastInsertId();
 }
 
-
-
 /**
  * 生成案件编号 - 与add_patent.php保持一致
  */
@@ -598,6 +712,56 @@ function generateCaseCode($pdo)
 {
     $prefix = 'ZL' . date('Ymd');
     $sql = "SELECT COUNT(*) FROM patent_case_info WHERE case_code LIKE :prefix";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([':prefix' => $prefix . '%']);
+    $count = $stmt->fetchColumn();
+    $serial = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+    return $prefix . $serial;
+}
+
+/**
+ * 根据客户名称获取或创建客户
+ */
+function getOrCreateCustomer($pdo, $customer_name)
+{
+    if (empty($customer_name)) {
+        return null;
+    }
+
+    // 首先检查客户是否已存在
+    $stmt = $pdo->prepare("SELECT id FROM customer WHERE customer_name_cn = ?");
+    $stmt->execute([$customer_name]);
+    $existing_customer = $stmt->fetch();
+
+    if ($existing_customer) {
+        return $existing_customer['id'];
+    }
+
+    // 客户不存在，创建新客户
+    try {
+        // 生成客户编号
+        $customer_code = generateCustomerCode($pdo);
+
+        $stmt = $pdo->prepare("INSERT INTO customer (customer_code, customer_name_cn, created_at) VALUES (?, ?, NOW())");
+        $stmt->execute([$customer_code, $customer_name]);
+
+        $new_customer_id = $pdo->lastInsertId();
+        error_log("自动创建新客户: ID={$new_customer_id}, 名称={$customer_name}, 编号={$customer_code}");
+
+        return $new_customer_id;
+    } catch (Exception $e) {
+        error_log("创建客户失败: " . $e->getMessage());
+        throw new Exception("创建客户失败: " . $e->getMessage());
+    }
+}
+
+/**
+ * 生成客户编号
+ */
+function generateCustomerCode($pdo)
+{
+    $prefix = 'KH' . date('Ymd');
+    $sql = "SELECT COUNT(*) FROM customer WHERE customer_code LIKE :prefix";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':prefix' => $prefix . '%']);
     $count = $stmt->fetchColumn();

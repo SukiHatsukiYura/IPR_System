@@ -62,6 +62,7 @@ $headers = [
     'case_name' => '案件名称*',
     'client_case_code' => '客户文号',
     'client_id' => '客户ID*',
+    'client_name' => '客户名称(中)*',
     'business_type' => '业务类型',
     'process_item' => '处理事项*',
     'case_status' => '案件状态',
@@ -204,7 +205,8 @@ $tips = [
     '2、部分字段需要填写当前系统已有的数据，请参考下方对照表',
     '3、日期格式必须为：YYYY-MM-DD（如：2025-01-01）',
     '4、多个ID用逗号分隔（如业务人员ID：1,2,3）',
-    '5、是否代办资助、有无材料字段：1表示是/有，0表示否/无'
+    '5、是否代办资助、有无材料字段：1表示是/有，0表示否/无',
+    '6、客户ID和客户名称(中)必须至少填写一个，优先使用客户ID，如果客户不存在会自动创建'
 ];
 
 // 将提示信息两两组合在一行中显示
@@ -259,6 +261,18 @@ foreach ($relatedData['customers'] as $customer) {
 }
 $customer_info = rtrim($customer_info, '，');
 echo '<Data ss:Type="String">' . $customer_info . '</Data>' . "\n";
+echo '</Cell>' . "\n";
+echo '</Row>' . "\n";
+
+// 客户名称参考信息
+echo '<Row ss:Height="30">' . "\n";
+echo '<Cell ss:MergeAcross="' . ($column_count - 1) . '" ss:StyleID="InfoStyle">' . "\n";
+$customer_name_info = '客户名称参考：';
+foreach ($relatedData['customers'] as $customer) {
+    $customer_name_info .= htmlspecialchars($customer['customer_name_cn']) . '，';
+}
+$customer_name_info = rtrim($customer_name_info, '，');
+echo '<Data ss:Type="String">' . $customer_name_info . '</Data>' . "\n";
 echo '</Cell>' . "\n";
 echo '</Row>' . "\n";
 
