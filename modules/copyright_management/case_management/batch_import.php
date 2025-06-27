@@ -379,14 +379,28 @@ function batchImportCopyrights($pdo, $rows, $header_map, $user_id)
                     continue;
                 }
 
-                // 如果用户填写了客户ID，验证客户ID是否存在
+                // 如果用户填写了客户ID，验证客户ID是否存在并检查版权案件类型
                 if (isset($data['client_id']) && !empty($data['client_id']) && is_numeric($data['client_id'])) {
-                    $stmt = $pdo->prepare("SELECT id FROM customer WHERE id = ?");
+                    $stmt = $pdo->prepare("SELECT id, case_type_copyright FROM customer WHERE id = ?");
                     $stmt->execute([$data['client_id']]);
-                    if (!$stmt->fetch()) {
+                    $customer = $stmt->fetch();
+
+                    if (!$customer) {
                         $errors[] = "第{$line_number}行: 客户ID {$data['client_id']} 不存在，请填写有效的客户ID";
                         $error_count++;
                         continue;
+                    }
+
+                    // 如果客户存在但没有版权案件类型，则添加版权案件类型
+                    if ($customer['case_type_copyright'] == 0) {
+                        try {
+                            $stmt = $pdo->prepare("UPDATE customer SET case_type_copyright = 1 WHERE id = ?");
+                            $stmt->execute([$data['client_id']]);
+                            error_log("为客户ID {$data['client_id']} 添加版权案件类型");
+                        } catch (Exception $e) {
+                            error_log("更新客户ID {$data['client_id']} 版权案件类型失败: " . $e->getMessage());
+                            // 不抛出异常，因为客户存在，只是案件类型更新失败
+                        }
                     }
                 }
 
@@ -792,7 +806,7 @@ function generateCaseCode($pdo)
 }
 
 /**
- * 根据客户名称获取或创建客户
+ * 根据客户名称获取或创建客户（版权模块）
  */
 function getOrCreateCustomer($pdo, $customer_name)
 {
@@ -800,25 +814,39 @@ function getOrCreateCustomer($pdo, $customer_name)
         return null;
     }
 
-    // 首先检查客户是否已存在
-    $stmt = $pdo->prepare("SELECT id FROM customer WHERE customer_name_cn = ?");
+    // 首先检查客户是否已存在，同时获取版权案件类型标识
+    $stmt = $pdo->prepare("SELECT id, case_type_copyright FROM customer WHERE customer_name_cn = ?");
     $stmt->execute([$customer_name]);
     $existing_customer = $stmt->fetch();
 
     if ($existing_customer) {
-        return $existing_customer['id'];
+        $customer_id = $existing_customer['id'];
+
+        // 如果客户存在但没有版权案件类型，则添加版权案件类型
+        if ($existing_customer['case_type_copyright'] == 0) {
+            try {
+                $stmt = $pdo->prepare("UPDATE customer SET case_type_copyright = 1 WHERE id = ?");
+                $stmt->execute([$customer_id]);
+                error_log("为现有客户添加版权案件类型: ID={$customer_id}, 名称={$customer_name}");
+            } catch (Exception $e) {
+                error_log("更新客户版权案件类型失败: " . $e->getMessage());
+                // 不抛出异常，因为客户已存在，只是案件类型更新失败
+            }
+        }
+
+        return $customer_id;
     }
 
-    // 客户不存在，创建新客户
+    // 客户不存在，创建新客户（自动设置版权案件类型为1）
     try {
         // 生成客户编号
         $customer_code = generateCustomerCode($pdo);
 
-        $stmt = $pdo->prepare("INSERT INTO customer (customer_code, customer_name_cn, created_at) VALUES (?, ?, NOW())");
+        $stmt = $pdo->prepare("INSERT INTO customer (customer_code, customer_name_cn, case_type_copyright, created_at) VALUES (?, ?, 1, NOW())");
         $stmt->execute([$customer_code, $customer_name]);
 
         $new_customer_id = $pdo->lastInsertId();
-        error_log("自动创建新客户: ID={$new_customer_id}, 名称={$customer_name}, 编号={$customer_code}");
+        error_log("自动创建新客户: ID={$new_customer_id}, 名称={$customer_name}, 编号={$customer_code}, 版权案件类型=1");
 
         return $new_customer_id;
     } catch (Exception $e) {

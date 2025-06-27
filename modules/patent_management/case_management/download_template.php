@@ -52,17 +52,23 @@ function getOptionsData()
 $relatedData = getRelatedTableData($pdo);
 $optionsData = getOptionsData();
 
-// 专利案件基本信息表的字段（根据add_patent.php的必填字段修正）
+// 专利案件基本信息表的字段（必填字段放在左侧，我方文号固定第一列）
 $headers = [
+    // 第1列：我方文号（固定第一列）
     'case_code' => '我方文号(可选，留空则自动生成)',
+
+    // 第2-6列：必填字段
     'case_name' => '案件名称*',
-    'case_name_en' => '英文名称',
     'business_dept_id' => '承办部门ID*',
-    'open_date' => '开卷日期(YYYY-MM-DD)',
-    'client_case_code' => '客户文号',
     'process_item' => '处理事项*',
     'client_id' => '客户ID*',
     'client_name' => '客户名称(中)*',
+    'application_type' => '申请类型*',
+
+    // 第7列及以后：可选字段
+    'case_name_en' => '英文名称',
+    'open_date' => '开卷日期(YYYY-MM-DD)',
+    'client_case_code' => '客户文号',
     'business_type' => '业务类型',
     'entrust_date' => '委案日期(YYYY-MM-DD)',
     'case_status' => '案件状态',
@@ -84,7 +90,6 @@ $headers = [
     'business_user_ids' => '业务人员ID(多个用逗号分隔)',
     'business_assistant_ids' => '业务助理ID(多个用逗号分隔)',
     'project_leader_id' => '项目负责人ID',
-    'application_type' => '申请类型*',
     'is_allocated' => '是否配案(1是0否，默认1)',
     'country' => '国家(地区)',
     'case_flow' => '案件流向',

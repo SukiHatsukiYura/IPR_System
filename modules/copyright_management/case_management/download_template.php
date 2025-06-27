@@ -56,18 +56,23 @@ function getOptionsData()
 $relatedData = getRelatedTableData($pdo);
 $optionsData = getOptionsData();
 
-// 版权案件基本信息表的字段（去掉案件类型，业务类型改为非必填）
+// 版权案件基本信息表的字段（必填字段放在左侧，我方文号固定第一列）
 $headers = [
+    // 第1列：我方文号（固定第一列）
     'case_code' => '我方文号(可选，留空则自动生成)',
+
+    // 第2-6列：必填字段
     'case_name' => '案件名称*',
-    'client_case_code' => '客户文号',
+    'business_dept_id' => '承办部门ID*',
+    'process_item' => '处理事项*',
     'client_id' => '客户ID*',
     'client_name' => '客户名称(中)*',
+
+    // 第7列及以后：可选字段
+    'client_case_code' => '客户文号',
     'business_type' => '业务类型',
-    'process_item' => '处理事项*',
     'case_status' => '案件状态',
     'entrust_date' => '委案日期(YYYY-MM-DD)',
-    'business_dept_id' => '承办部门ID*',
     'business_user_ids' => '业务人员ID(多个用逗号分隔)',
     'application_mode' => '申请方式',
     'application_type' => '申请类型',
@@ -206,7 +211,9 @@ $tips = [
     '3、日期格式必须为：YYYY-MM-DD（如：2025-01-01）',
     '4、多个ID用逗号分隔（如业务人员ID：1,2,3）',
     '5、是否代办资助、有无材料字段：1表示是/有，0表示否/无',
-    '6、客户ID和客户名称(中)必须至少填写一个，优先使用客户ID，如果客户不存在会自动创建'
+    '6、客户ID和客户名称(中)二选一填写，不能都为空',
+    '7、客户ID：填写系统已有的客户ID数字',
+    '8、客户名称(中)：填写客户名称，不存在则自动创建'
 ];
 
 // 将提示信息两两组合在一行中显示

@@ -66,13 +66,22 @@ function getOptionsData()
 $relatedData = getRelatedTableData($pdo);
 $optionsData = getOptionsData();
 
-// 客户信息表的字段
+// 客户信息表的字段（必填字段放在左侧，客户编号固定第一列）
 $headers = [
+    // 第1列：客户编号（固定第一列）
     'customer_code' => '客户编号(可选，留空则自动生成)',
+
+    // 第2-5列：必填字段
     'customer_name_cn' => '客户名称(中)*',
+    'case_type_patent' => '案件类型-专利(1是0否)*',
+    'case_type_trademark' => '案件类型-商标(1是0否)*',
+    'case_type_copyright' => '案件类型-版权(1是0否)*',
+
+    // 第6列及以后：可选字段
     'customer_name_en' => '客户名称(英)',
     'company_leader' => '公司负责人',
     'email' => '邮件',
+    'phone' => '电话',
     'business_staff_id' => '业务人员ID',
     'internal_signer' => '内部签署人',
     'external_signer' => '外部签署人',
@@ -83,10 +92,6 @@ $headers = [
     'deal_status' => '成交状态',
     'project_leader_id' => '项目负责人ID',
     'remark' => '备注',
-    'case_type_patent' => '案件类型-专利(1是0否)*',
-    'case_type_trademark' => '案件类型-商标(1是0否)*',
-    'case_type_copyright' => '案件类型-版权(1是0否)*',
-    'phone' => '电话',
     'industry' => '所属行业(多选，逗号分隔)',
     'creator' => '创建人',
     'internal_signer_phone' => '内部签署人电话',

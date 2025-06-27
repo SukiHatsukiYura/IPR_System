@@ -60,23 +60,28 @@ function getOptionsData()
 $relatedData = getRelatedTableData($pdo);
 $optionsData = getOptionsData();
 
-// 商标案件基本信息表的字段（根据add_trademark.php的必填字段修正）
+// 商标案件基本信息表的字段（必填字段放在左侧，我方文号固定第一列）
 $headers = [
+    // 第1列：我方文号（固定第一列）
     'case_code' => '我方文号(可选，留空则自动生成)',
+
+    // 第2-6列：必填字段
     'case_name' => '商标名称*',
+    'business_dept_id' => '承办部门ID*',
+    'process_item' => '处理事项*',
+    'client_id' => '客户ID*',
+    'client_name' => '客户名称(中)*',
+
+    // 第7列及以后：可选字段
     'case_name_en' => '英文名称',
     'application_no' => '申请号',
-    'business_dept_id' => '承办部门ID*',
     'trademark_class' => '商标类别(多个用逗号分隔)',
     'initial_publication_date' => '初审公告日(YYYY-MM-DD)',
     'initial_publication_period' => '初审公告期',
-    'client_id' => '客户ID*',
-    'client_name' => '客户名称(中)*',
     'case_type' => '案件类型',
     'business_type' => '业务类型',
     'entrust_date' => '委案日期(YYYY-MM-DD)',
     'case_status' => '案件状态',
-    'process_item' => '处理事项*',
     'source_country' => '案源国',
     'trademark_description' => '商标说明',
     'other_name' => '其它名称',
@@ -218,10 +223,10 @@ $tips = [
     '2、部分字段需要填写当前系统已有的数据，请参考下方对照表',
     '3、日期格式必须为：YYYY-MM-DD（如：2025-01-01）',
     '4、多个ID用逗号分隔（如业务人员ID：1,2,3）',
-    '5、商标类别可多选，用逗号分隔（如：1(化工原料),2(颜料油漆)）',
-    '6、是否主案字段：1表示是，0表示否，默认为0',
-    '7、商标图片需要导入后在编辑页面单独上传',
-    '8、客户ID和客户名称(中)必须至少填写一个，优先使用客户ID，如果客户不存在会自动创建',
+    '5、商标类别可多选，用逗号分隔（如：1,2,3）',
+    '6、客户ID和客户名称(中)二选一填写，不能都为空',
+    '7、客户ID：填写系统已有的客户ID数字',
+    '8、客户名称(中)：填写客户名称，不存在则自动创建'
 ];
 
 // 将提示信息两两组合在一行中显示

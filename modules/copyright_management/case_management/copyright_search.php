@@ -324,7 +324,7 @@ function render_customer_search($name, $customers, $get_val)
                 <h4>导入说明：</h4>
                 <ul style="margin:10px 0;padding-left:20px;color:#666;">
                     <li>请先下载Excel模板文件，使用模板文件填写数据，然后上传文件进行导入</li>
-                    <li>必填字段：案件名称、承办部门ID、客户ID、处理事项</li>
+                    <li>必填字段：案件名称、承办部门ID、客户ID/客户名称、处理事项</li>
                     <li>日期格式：YYYY-MM-DD（如：2025-01-01）</li>
                     <li>支持的文件格式：.xlsx, .xls, .csv</li>
                     <li>最大文件大小：10MB</li>
