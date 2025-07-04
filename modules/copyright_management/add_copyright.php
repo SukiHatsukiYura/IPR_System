@@ -308,10 +308,8 @@ function render_select($name, $options, $val = '', $placeholder = '--请选择--
                     <td><input type="text" name="case_code" class="module-input" value="系统自动生成" readonly></td>
                     <td class="module-label module-req">*案件名称</td>
                     <td><input type="text" name="case_name" class="module-input" value="" required></td>
-                    <td class="module-label">案源国</td>
-                    <td>
-                        <?php echo render_select('source_country', $source_countries, '中国'); ?>
-                    </td>
+                    <td class="module-label">客户文号</td>
+                    <td><input type="text" name="client_case_code" class="module-input" value=""></td>
                 </tr>
                 <tr>
                     <td class="module-label module-req">*承办部门</td>
@@ -322,54 +320,28 @@ function render_select($name, $options, $val = '', $placeholder = '--请选择--
                     <td>
                         <input type="text" name="case_type" class="module-input" value="<?= h($case_type_fixed) ?>" readonly>
                     </td>
-                    <td class="module-label">客户文号</td>
-                    <td><input type="text" name="client_case_code" class="module-input" value=""></td>
+                    <td class="module-label">业务类型</td>
+                    <td>
+                        <?php render_select_search('business_type', $business_types_options, ''); ?>
+                    </td>
                 </tr>
                 <tr>
                     <td class="module-label module-req">*客户名称</td>
                     <td>
                         <?php render_select_search('client_id', $customers_options, ''); ?>
                     </td>
-                    <td class="module-label">业务类型</td>
-                    <td>
-                        <?php render_select_search('business_type', $business_types_options, ''); ?>
-                    </td>
                     <td class="module-label module-req">*处理事项</td>
                     <td>
                         <?php render_select_search('process_item', $process_items_options, ''); ?>
                     </td>
-                </tr>
-                <tr>
                     <td class="module-label">案件状态</td>
                     <td>
                         <?php echo render_select('case_status', $case_statuses, ''); ?>
                     </td>
+                </tr>
+                <tr>
                     <td class="module-label">委案日期</td>
                     <td><input type="date" name="entrust_date" class="module-input" value=""></td>
-                    <td class="module-label">申请方式</td>
-                    <td>
-                        <?php echo render_select('application_mode', $application_modes, ''); ?>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="module-label">业务人员</td>
-                    <td>
-                        <?php render_select_search_multi('business_user_ids', $users_options, ''); ?>
-                    </td>
-                    <td class="module-label">申请类型</td>
-                    <td>
-                        <?php echo render_select('application_type', $application_types, ''); ?>
-                    </td>
-                    <td class="module-label">国家(地区)</td>
-                    <td>
-                        <?php echo render_select('country', $countries, ''); ?>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="module-label">案件流向</td>
-                    <td>
-                        <?php echo render_select('case_flow', $case_flows, ''); ?>
-                    </td>
                     <td class="module-label">起始阶段</td>
                     <td>
                         <?php echo render_select('start_stage', $start_stages, ''); ?>
@@ -379,20 +351,18 @@ function render_select($name, $options, $val = '', $placeholder = '--请选择--
                         <label><input type="radio" name="is_subsidy_agent" value="1">是</label>
                         <label><input type="radio" name="is_subsidy_agent" value="0" checked>否</label>
                     </td>
-
                 </tr>
                 <tr>
                     <td class="module-label">加快</td>
                     <td>
                         <?php echo render_select('is_expedited', $expedited_levels, ''); ?>
                     </td>
-                    <td class="module-label">开卷日</td>
-                    <td><input type="date" name="open_date" class="module-input" value=""></td>
                     <td class="module-label">有无材料</td>
                     <td>
                         <label><input type="radio" name="is_material_available" value="1">有</label>
                         <label><input type="radio" name="is_material_available" value="0" checked>无</label>
                     </td>
+                    <td colspan="2"></td>
                 </tr>
                 <tr>
                     <td class="module-label">受理号</td>
@@ -414,7 +384,63 @@ function render_select($name, $options, $val = '', $placeholder = '--请选择--
                     <td class="module-label">案件备注</td>
                     <td colspan="5"><textarea name="remarks" class="module-textarea" rows="3" style="width:100%;"></textarea></td>
                 </tr>
+                <tr>
+                    <td colspan="6" style="text-align:center;padding:15px;">
+                        <button type="button" id="toggle-advanced-fields" class="btn-mini" style="background:#f0f0f0;border:1px solid #ddd;padding:8px 16px;cursor:pointer;">
+                            <i class="icon-down" style="margin-right:5px;">▼</i>
+                            <span class="toggle-text">展开</span>
+                        </button>
+                    </td>
+                </tr>
             </table>
+
+            <!-- 可展开/隐藏的高级字段区域 -->
+            <div id="advanced-fields" style="display:none;margin-top:15px;">
+                <!-- <h4 style="margin-bottom:10px;color:#666;border-bottom:1px solid #eee;padding-bottom:5px;">高级选项</h4> -->
+                <table class="module-table" style="width:100%;max-width:1800px;table-layout:fixed;">
+                    <colgroup>
+                        <col style="width:120px;">
+                        <col style="width:220px;">
+                        <col style="width:120px;">
+                        <col style="width:220px;">
+                        <col style="width:120px;">
+                        <col style="width:220px;">
+                    </colgroup>
+                    <tr>
+                        <td class="module-label">业务人员</td>
+                        <td>
+                            <?php render_select_search_multi('business_user_ids', $users_options, ''); ?>
+                        </td>
+                        <td class="module-label">申请方式</td>
+                        <td>
+                            <?php echo render_select('application_mode', $application_modes, ''); ?>
+                        </td>
+                        <td class="module-label">申请类型</td>
+                        <td>
+                            <?php echo render_select('application_type', $application_types, ''); ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="module-label">国家(地区)</td>
+                        <td>
+                            <?php echo render_select('country', $countries, ''); ?>
+                        </td>
+                        <td class="module-label">案件流向</td>
+                        <td>
+                            <?php echo render_select('case_flow', $case_flows, ''); ?>
+                        </td>
+                        <td class="module-label">案源国</td>
+                        <td>
+                            <?php echo render_select('source_country', $source_countries, '中国'); ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="module-label">开卷日</td>
+                        <td><input type="date" name="open_date" class="module-input" value=""></td>
+                        <td colspan="4"></td>
+                    </tr>
+                </table>
+            </div>
         </form>
     </div>
     <script>
@@ -470,6 +496,26 @@ function render_select($name, $options, $val = '', $placeholder = '--请选择--
                     document.querySelectorAll('.module-select-search-box input[type=hidden]').forEach(i => i.value = '');
                     document.querySelectorAll('.module-select-search-multi-input').forEach(i => i.value = '');
                     document.querySelectorAll('.module-select-search-multi-box input[type=hidden]').forEach(i => i.value = '');
+                }
+            };
+
+            // 展开/隐藏高级字段功能
+            var toggleBtn = document.getElementById('toggle-advanced-fields');
+            var advancedFields = document.getElementById('advanced-fields');
+            var toggleIcon = toggleBtn.querySelector('.icon-down');
+            var toggleText = toggleBtn.querySelector('.toggle-text');
+
+            toggleBtn.onclick = function() {
+                if (advancedFields.style.display === 'none') {
+                    // 展开
+                    advancedFields.style.display = 'block';
+                    toggleIcon.textContent = '▲';
+                    toggleText.textContent = '隐藏';
+                } else {
+                    // 隐藏
+                    advancedFields.style.display = 'none';
+                    toggleIcon.textContent = '▼';
+                    toggleText.textContent = '展开';
                 }
             };
         })();

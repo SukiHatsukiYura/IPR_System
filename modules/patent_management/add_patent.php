@@ -155,6 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         'application_mode' => trim($_POST['application_mode'] ?? ''),
         'business_user_ids' => trim($_POST['business_user_ids'] ?? ''),
         'business_assistant_ids' => trim($_POST['business_assistant_ids'] ?? ''),
+        'project_leader_id' => intval($_POST['project_leader_id'] ?? 0),
         'application_type' => trim($_POST['application_type'] ?? ''),
         'is_allocated' => intval($_POST['is_allocated'] ?? 1),
         'country' => trim($_POST['country'] ?? ''),
@@ -368,25 +369,30 @@ function render_select($name, $options, $val = '', $placeholder = '--请选择--
                     <td>
                         <?php render_select_search('handler_id', $users_options, ''); ?>
                     </td>
-                    <td class="module-label">公告号</td>
-                    <td><input type="text" name="announcement_no" class="module-input" value=""></td>
+                    <td class="module-label">项目负责人</td>
+                    <td>
+                        <?php render_select_search('project_leader_id', $users_options, ''); ?>
+                    </td>
                 </tr>
                 <tr>
+                    <td class="module-label">公告号</td>
+                    <td><input type="text" name="announcement_no" class="module-input" value=""></td>
                     <td class="module-label">公告日</td>
                     <td><input type="date" name="announcement_date" class="module-input" value=""></td>
                     <td class="module-label">证书号</td>
                     <td><input type="text" name="certificate_no" class="module-input" value=""></td>
-                    <td class="module-label">属满日</td>
-                    <td><input type="date" name="expire_date" class="module-input" value=""></td>
                 </tr>
                 <tr>
+                    <td class="module-label">属满日</td>
+                    <td><input type="date" name="expire_date" class="module-input" value=""></td>
                     <td class="module-label">进入实审日</td>
                     <td><input type="date" name="enter_substantive_date" class="module-input" value=""></td>
                     <td class="module-label">申请方式</td>
-                    <td colspan="3">
+                    <td>
                         <?php echo render_select('application_mode', $application_modes, ''); ?>
                     </td>
                 </tr>
+
                 <tr>
                     <td class="module-label">案件备注</td>
                     <td colspan="5" style="width:100%"><textarea name="remarks" class="module-input" style="min-height:48px;width:100%;resize:vertical;"></textarea></td>

@@ -12,7 +12,11 @@
             <div class="update-notification">
                 <div class="update-item">
                     <span class="update-badge new">NEW</span>
-                    <span class="update-text">批量导入功能已开放：客户列表、专利查询、商标查询、版权查询现已支持Excel批量导入功能，可大幅提升数据录入效率。</span>
+                    <span class="update-text">个人案件-部门查询、案件查询已开放：专利案件、商标案件模块现已开放个人案件导航的部分功能。</span>
+                </div>
+                <div class="update-item">
+                    <span class="update-badge new">NEW</span>
+                    <span class="update-text">版权案件：已开放案件管理-文件管理功能，版权案件模块已完全实现。</span>
                 </div>
             </div>
         </div>
@@ -53,36 +57,36 @@
 
                 <div class="feature-category">
                     <h4 class="category-title">专利管理</h4>
-                    <div class="feature-links">
+                    <div class="feature-links grid-2x2">
                         <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(1, 0, null) : alert('框架导航功能不可用')" class="feature-link">
                             <i class="icon-add"></i>新增专利
                         </a>
                         <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(1, 5, 0) : alert('框架导航功能不可用')" class="feature-link">
                             <i class="icon-search"></i>专利查询
                         </a>
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(1, 1, 4) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-department"></i>部门案件
+                        </a>
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(1, 1, 5) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-user"></i>个人案件
+                        </a>
                     </div>
                 </div>
 
                 <div class="feature-category">
                     <h4 class="category-title">商标管理</h4>
-                    <div class="feature-links">
+                    <div class="feature-links grid-2x2">
                         <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(2, 0, null) : alert('框架导航功能不可用')" class="feature-link">
                             <i class="icon-add"></i>新增商标
                         </a>
                         <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(2, 3, 0) : alert('框架导航功能不可用')" class="feature-link">
                             <i class="icon-search"></i>商标查询
                         </a>
-                    </div>
-                </div>
-
-                <div class="feature-category">
-                    <h4 class="category-title">版权管理</h4>
-                    <div class="feature-links">
-                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(3, 0, null) : alert('框架导航功能不可用')" class="feature-link">
-                            <i class="icon-add"></i>新增版权
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(2, 1, 4) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-department"></i>部门案件
                         </a>
-                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(3, 1, 0) : alert('框架导航功能不可用')" class="feature-link">
-                            <i class="icon-search"></i>版权查询
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(2, 1, 5) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-user"></i>个人案件
                         </a>
                     </div>
                 </div>
@@ -306,6 +310,9 @@
         align-items: flex-start;
         gap: 12px;
         line-height: 1.6;
+        /* 上下间距10px */
+        margin-bottom: 10px;
+        margin-top: 10px;
     }
 
     .update-badge {
@@ -371,6 +378,14 @@
     .feature-links {
         display: flex;
         flex-direction: column;
+        gap: 8px;
+    }
+
+    /* 专利管理和商标管理的特殊布局 - 2x2网格 */
+    .feature-links.grid-2x2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
         gap: 8px;
     }
 

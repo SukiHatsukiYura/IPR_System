@@ -379,14 +379,20 @@ function render_customer_search($name, $customers, $get_val)
 }
 ?>
 <div class="module-panel">
-    <div class="module-btns">
-        <button type="button" class="btn-search"><i class="icon-search"></i> 搜索</button>
-        <button type="button" class="btn-reset"><i class="icon-cancel"></i> 重置</button>
-        <button type="button" class="btn-add" onclick="window.parent.openTab ? window.parent.openTab(2, 0, null) : alert('框架导航功能不可用')"><i class="icon-add"></i> 新增商标</button>
-        <button type="button" class="btn-edit" disabled><i class="icon-edit"></i> 修改</button>
-        <button type="button" class="btn-download-template"><i class="icon-save"></i> 下载模板</button>
-        <button type="button" class="btn-batch-import"><i class="icon-add"></i> 批量导入</button>
-        <button type="button" class="btn-image-import"><i class="icon-add"></i> 图片导入</button>
+    <div class="module-btns" style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-search"><i class="icon-search"></i> 搜索</button>
+            <button type="button" class="btn-reset"><i class="icon-cancel"></i> 重置</button>
+            <button type="button" class="btn-add" onclick="window.parent.openTab ? window.parent.openTab(2, 0, null) : alert('框架导航功能不可用')"><i class="icon-add"></i> 新增商标</button>
+            <button type="button" class="btn-edit" disabled><i class="icon-edit"></i> 修改</button>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-download-template"><i class="icon-save"></i> 下载模板</button>
+            <button type="button" class="btn-batch-import"><i class="icon-add"></i> 批量导入</button>
+            <button type="button" class="btn-download-current"><i class="icon-list"></i> 下载当前案件信息</button>
+            <button type="button" class="btn-batch-update"><i class="icon-edit"></i> 批量修改</button>
+            <button type="button" class="btn-image-import"><i class="icon-add"></i> 图片导入</button>
+        </div>
     </div>
     <form id="search-form" class="module-form" autocomplete="off">
         <input type="hidden" name="page" value="1">
@@ -489,7 +495,7 @@ function render_customer_search($name, $customers, $get_val)
                 <h4>导入说明：</h4>
                 <ul style="margin:10px 0;padding-left:20px;color:#666;">
                     <li>请先下载Excel模板文件，使用模板文件填写数据，然后上传文件进行导入</li>
-                    <li>必填字段：商标名称、承办部门ID、客户ID/客户名称、处理事项</li>
+                    <li>必填字段：商标名称、承办部门ID、客户ID/客户名称</li>
                     <li>日期格式：YYYY-MM-DD（如：2025-01-01）</li>
                     <li>支持的文件格式：.xlsx, .xls, .csv</li>
                     <li>最大文件大小：10MB</li>
@@ -516,6 +522,51 @@ function render_customer_search($name, $customers, $get_val)
         <div class="module-modal-footer">
             <button type="button" class="btn-theme" id="btn-start-import">开始导入</button>
             <button type="button" class="btn-cancel" id="btn-cancel-import">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- 批量修改模态框 -->
+<div id="batch-update-modal" class="module-modal" style="display:none;">
+    <div class="module-modal-content" style="width:600px;">
+        <div class="module-modal-header">
+            <h3 class="module-modal-title">批量修改商标案件</h3>
+            <button class="module-modal-close">&times;</button>
+        </div>
+        <div class="module-modal-body" style="padding:20px;">
+            <div style="margin-bottom:20px;">
+                <h4>修改说明：</h4>
+                <ul style="margin:10px 0;padding-left:20px;color:#666;">
+                    <li>请先使用"下载当前案件信息"功能获取现有案件数据</li>
+                    <li>在Excel文件中修改需要更新的字段，保持id列不变</li>
+                    <li>灰色表头的id字段禁止修改，用于定位要更新的案件</li>
+                    <li>必填字段：商标名称、承办部门ID、客户ID/客户名称</li>
+                    <li>日期格式：YYYY-MM-DD（如：2025-01-01）</li>
+                    <li>支持的文件格式：.xlsx, .xls, .csv</li>
+                    <li>最大文件大小：10MB</li>
+                </ul>
+            </div>
+            <form id="update-form" enctype="multipart/form-data">
+                <table class="module-table">
+                    <tr>
+                        <td class="module-label module-req">*选择文件</td>
+                        <td>
+                            <input type="file" name="update_file" id="update-file" accept=".xlsx,.xls,.csv" class="module-input" required>
+                        </td>
+                    </tr>
+                </table>
+            </form>
+            <div id="update-progress" style="display:none;margin-top:20px;">
+                <div style="background:#f0f0f0;border-radius:10px;overflow:hidden;">
+                    <div id="update-progress-bar" style="height:20px;background:#29b6b0;width:0%;transition:width 0.3s;"></div>
+                </div>
+                <div id="update-progress-text" style="text-align:center;margin-top:10px;">准备修改...</div>
+            </div>
+            <div id="update-result" style="display:none;margin-top:20px;"></div>
+        </div>
+        <div class="module-modal-footer">
+            <button type="button" class="btn-theme" id="btn-start-update">开始修改</button>
+            <button type="button" class="btn-cancel" id="btn-cancel-update">取消</button>
         </div>
     </div>
 </div>
@@ -571,16 +622,22 @@ function render_customer_search($name, $customers, $get_val)
             btnReset = document.querySelector('.btn-reset'),
             btnEdit = document.querySelector('.btn-edit'),
             btnDownloadTemplate = document.querySelector('.btn-download-template'),
+            btnDownloadCurrent = document.querySelector('.btn-download-current'),
             btnBatchImport = document.querySelector('.btn-batch-import'),
+            btnBatchUpdate = document.querySelector('.btn-batch-update'),
             btnImageImport = document.querySelector('.btn-image-import'),
             batchImportModal = document.getElementById('batch-import-modal'),
+            batchUpdateModal = document.getElementById('batch-update-modal'),
             imageImportModal = document.getElementById('image-import-modal'),
             btnStartImport = document.getElementById('btn-start-import'),
             btnCancelImport = document.getElementById('btn-cancel-import'),
+            btnStartUpdate = document.getElementById('btn-start-update'),
+            btnCancelUpdate = document.getElementById('btn-cancel-update'),
             btnSaveImages = document.getElementById('btn-save-images'),
             btnBatchDeleteImages = document.getElementById('btn-batch-delete-images'),
             btnCancelImageImport = document.getElementById('btn-cancel-image-import'),
             modalClose = batchImportModal.querySelector('.module-modal-close'),
+            updateModalClose = batchUpdateModal.querySelector('.module-modal-close'),
             imageModalClose = imageImportModal.querySelector('.module-modal-close'),
             trademarkList = document.getElementById('trademark-list'),
             totalRecordsEl = document.getElementById('total-records'),
@@ -680,6 +737,29 @@ function render_customer_search($name, $customers, $get_val)
             var downloadUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/download_template.php';
             window.open(downloadUrl, '_blank');
         };
+
+        // 下载当前案件信息按钮事件
+        btnDownloadCurrent.onclick = function() {
+            var formData = new FormData(form),
+                params = new URLSearchParams();
+
+            // 添加当前搜索条件
+            for (var pair of formData.entries()) {
+                if (pair[1] && pair[1].trim() !== '') {
+                    params.append(pair[0], pair[1]);
+                }
+            }
+
+            var baseUrl = window.location.href.split('?')[0];
+            var downloadUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/download_current_cases.php';
+
+            if (params.toString()) {
+                downloadUrl += '?' + params.toString();
+            }
+
+            window.open(downloadUrl, '_blank');
+        };
+
         // 批量导入按钮事件
         btnBatchImport.onclick = function() {
             batchImportModal.style.display = 'flex';
@@ -689,6 +769,17 @@ function render_customer_search($name, $customers, $get_val)
             document.getElementById('import-result').style.display = 'none';
             btnStartImport.disabled = false;
             btnStartImport.textContent = '开始导入';
+        };
+
+        // 批量修改按钮事件
+        btnBatchUpdate.onclick = function() {
+            batchUpdateModal.style.display = 'flex';
+            // 重置表单
+            document.getElementById('update-form').reset();
+            document.getElementById('update-progress').style.display = 'none';
+            document.getElementById('update-result').style.display = 'none';
+            btnStartUpdate.disabled = false;
+            btnStartUpdate.textContent = '开始修改';
         };
 
         // 图片导入按钮事件
@@ -701,12 +792,17 @@ function render_customer_search($name, $customers, $get_val)
         window.closeBatchImportModal = function() {
             batchImportModal.style.display = 'none';
         };
+        window.closeBatchUpdateModal = function() {
+            batchUpdateModal.style.display = 'none';
+        };
         window.closeImageImportModal = function() {
             imageImportModal.style.display = 'none';
         };
         btnCancelImport.onclick = closeBatchImportModal;
+        btnCancelUpdate.onclick = closeBatchUpdateModal;
         btnCancelImageImport.onclick = closeImageImportModal;
         modalClose.onclick = closeBatchImportModal;
+        updateModalClose.onclick = closeBatchUpdateModal;
         imageModalClose.onclick = closeImageImportModal;
 
         // 开始导入按钮事件
@@ -776,12 +872,20 @@ function render_customer_search($name, $customers, $get_val)
                         resultDiv.style.display = 'block';
 
                         if (response.success) {
-                            resultDiv.innerHTML = '<div style="color:#388e3c;"><strong>导入成功！</strong><br>' +
-                                '成功导入：' + response.success_count + ' 条<br>' +
-                                (response.error_count > 0 ? '导入失败：' + response.error_count + ' 条<br>' : '') +
-                                (response.errors && response.errors.length > 0 ? '<br>错误详情：<br>' + response.errors.join('<br>') : '') +
-                                '<br><br><button class="btn-theme" onclick="loadTrademarkData(); closeBatchImportModal();">刷新列表并关闭</button>' +
-                                '</div>';
+                            var resultHtml = '<div style="color:#388e3c;"><strong>导入完成！</strong><br>' +
+                                '成功导入：' + response.success_count + ' 条<br>';
+
+                            if (response.error_count > 0) {
+                                resultHtml += '<span style="color:#f44336;">导入失败：' + response.error_count + ' 条</span><br>';
+                            }
+
+                            if (response.errors && response.errors.length > 0) {
+                                resultHtml += '<br><details style="margin-top:10px;"><summary style="cursor:pointer;color:#f44336;">查看错误详情</summary>' +
+                                    '<div style="margin-top:5px;color:#f44336;font-size:12px;">' + response.errors.join('<br>') + '</div></details>';
+                            }
+
+                            resultHtml += '<br><br><button class="btn-theme" onclick="loadTrademarkData(); closeBatchImportModal();">刷新列表并关闭</button></div>';
+                            resultDiv.innerHTML = resultHtml;
                         } else {
                             resultDiv.innerHTML = '<div style="color:#f44336;"><strong>导入失败：</strong><br>' +
                                 (response.message || '未知错误') +
@@ -803,6 +907,122 @@ function render_customer_search($name, $customers, $get_val)
                 btnStartImport.textContent = '开始导入';
                 document.getElementById('import-result').innerHTML = '<div style="color:#f44336;">导入失败：网络连接错误</div>';
                 document.getElementById('import-result').style.display = 'block';
+            };
+
+            xhr.send(formData);
+        };
+
+        // 开始修改按钮事件
+        btnStartUpdate.onclick = function() {
+            var fileInput = document.getElementById('update-file');
+            var file = fileInput.files[0];
+
+            if (!file) {
+                alert('请选择要修改的Excel文件');
+                return;
+            }
+
+            // 检查文件类型
+            var allowedTypes = [
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-excel',
+                'text/csv',
+                'text/plain',
+                'application/csv'
+            ];
+            if (!allowedTypes.includes(file.type)) {
+                alert('请选择Excel或CSV文件（.xlsx、.xls或.csv格式）');
+                return;
+            }
+
+            // 检查文件大小（10MB）
+            if (file.size > 10 * 1024 * 1024) {
+                alert('文件大小不能超过10MB');
+                return;
+            }
+
+            // 显示进度条
+            document.getElementById('update-progress').style.display = 'block';
+            document.getElementById('update-result').style.display = 'none';
+            btnStartUpdate.disabled = true;
+            btnStartUpdate.textContent = '修改中...';
+
+            // 准备表单数据
+            var formData = new FormData(document.getElementById('update-form'));
+            formData.append('action', 'batch_update');
+
+            // 发送请求
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'modules/trademark_management/case_management/batch_update.php', true);
+
+            // 监听上传进度
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    var percentComplete = (e.loaded / e.total) * 100;
+                    document.getElementById('update-progress-bar').style.width = percentComplete + '%';
+                    document.getElementById('update-progress-text').textContent = '上传中... ' + Math.round(percentComplete) + '%';
+                }
+            };
+
+            xhr.onload = function() {
+                btnStartUpdate.disabled = false;
+                btnStartUpdate.textContent = '开始修改';
+
+                if (xhr.status === 200) {
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        document.getElementById('update-progress-bar').style.width = '100%';
+                        document.getElementById('update-progress-text').textContent = '修改完成';
+
+                        // 显示结果
+                        var resultDiv = document.getElementById('update-result');
+                        resultDiv.style.display = 'block';
+
+                        if (response.success) {
+                            var resultHtml = '<div style="color:#388e3c;"><strong>修改完成！</strong><br>' +
+                                '处理案件总数：' + (response.processed_count + response.error_count) + ' 个<br>' +
+                                '实际更新：' + response.success_count + ' 个案件<br>';
+
+                            if (response.no_change_count > 0) {
+                                resultHtml += '无需更新：' + response.no_change_count + ' 个案件<br>';
+                            }
+
+                            if (response.error_count > 0) {
+                                resultHtml += '<span style="color:#f44336;">处理失败：' + response.error_count + ' 个案件</span><br>';
+                            }
+
+                            if (response.performance_info) {
+                                resultHtml += '<br><small style="color:#666;">' + response.performance_info + '</small><br>';
+                            }
+
+                            if (response.errors && response.errors.length > 0) {
+                                resultHtml += '<br><details style="margin-top:10px;"><summary style="cursor:pointer;color:#f44336;">查看错误详情</summary>' +
+                                    '<div style="margin-top:5px;color:#f44336;font-size:12px;">' + response.errors.join('<br>') + '</div></details>';
+                            }
+
+                            resultHtml += '<br><br><button class="btn-theme" onclick="loadTrademarkData(); closeBatchUpdateModal();">刷新列表并关闭</button></div>';
+                            resultDiv.innerHTML = resultHtml;
+                        } else {
+                            resultDiv.innerHTML = '<div style="color:#f44336;"><strong>修改失败：</strong><br>' +
+                                (response.message || '未知错误') +
+                                '<br><br><button class="btn-cancel" onclick="closeBatchUpdateModal();">关闭</button>' +
+                                '</div>';
+                        }
+                    } catch (e) {
+                        document.getElementById('update-result').innerHTML = '<div style="color:#f44336;">修改失败：服务器响应错误</div>';
+                        document.getElementById('update-result').style.display = 'block';
+                    }
+                } else {
+                    document.getElementById('update-result').innerHTML = '<div style="color:#f44336;">修改失败：网络错误</div>';
+                    document.getElementById('update-result').style.display = 'block';
+                }
+            };
+
+            xhr.onerror = function() {
+                btnStartUpdate.disabled = false;
+                btnStartUpdate.textContent = '开始修改';
+                document.getElementById('update-result').innerHTML = '<div style="color:#f44336;">修改失败：网络连接错误</div>';
+                document.getElementById('update-result').style.display = 'block';
             };
 
             xhr.send(formData);

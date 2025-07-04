@@ -87,6 +87,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
 
+    // 服务器端验证必填字段
+    $required_fields = [
+        'case_name' => '案件名称',
+        'business_dept_id' => '承办部门',
+        'process_item' => '处理事项',
+        'client_id' => '客户名称'
+    ];
+
+    $validation_errors = [];
+    foreach ($required_fields as $field => $label) {
+        if (empty($data[$field])) {
+            $validation_errors[] = $label;
+        }
+    }
+
+    // 特殊验证是否代办资助字段
+    if (!isset($_POST['is_subsidy_agent']) || ($_POST['is_subsidy_agent'] !== '0' && $_POST['is_subsidy_agent'] !== '1')) {
+        $validation_errors[] = '是否代办资助';
+    }
+
+    if (!empty($validation_errors)) {
+        echo json_encode(['success' => false, 'msg' => '请填写以下必填项：' . implode('、', $validation_errors)]);
+        exit;
+    }
+
     try {
         $set = [];
         foreach ($data as $k => $v) {
@@ -301,10 +326,8 @@ render_select_search_assets();
             <td><input type="text" name="case_code" class="module-input" value="<?= h($copyright_info['case_code']) ?>" readonly></td>
             <td class="module-label module-req">*案件名称</td>
             <td><input type="text" name="case_name" class="module-input" value="<?= h($copyright_info['case_name']) ?>" required></td>
-            <td class="module-label">案源国</td>
-            <td>
-                <?php echo render_select('source_country', $source_countries, $copyright_info['source_country']); ?>
-            </td>
+            <td class="module-label">客户文号</td>
+            <td><input type="text" name="client_case_code" class="module-input" value="<?= h($copyright_info['client_case_code']) ?>"></td>
         </tr>
         <tr>
             <td class="module-label module-req">*承办部门</td>
@@ -315,54 +338,28 @@ render_select_search_assets();
             <td>
                 <input type="text" name="case_type" class="module-input" value="<?= h($case_type_fixed) ?>" readonly>
             </td>
-            <td class="module-label">客户文号</td>
-            <td><input type="text" name="client_case_code" class="module-input" value="<?= h($copyright_info['client_case_code']) ?>"></td>
+            <td class="module-label">业务类型</td>
+            <td>
+                <?php render_select_search('business_type', $business_types_options, $copyright_info['business_type']); ?>
+            </td>
         </tr>
         <tr>
             <td class="module-label module-req">*客户名称</td>
             <td>
                 <?php render_select_search('client_id', $customers_options, $copyright_info['client_id']); ?>
             </td>
-            <td class="module-label">业务类型</td>
-            <td>
-                <?php render_select_search('business_type', $business_types_options, $copyright_info['business_type']); ?>
-            </td>
             <td class="module-label module-req">*处理事项</td>
             <td>
                 <?php render_select_search('process_item', $process_items_options, $copyright_info['process_item']); ?>
             </td>
-        </tr>
-        <tr>
             <td class="module-label">案件状态</td>
             <td>
                 <?php echo render_select('case_status', $case_statuses, $copyright_info['case_status']); ?>
             </td>
+        </tr>
+        <tr>
             <td class="module-label">委案日期</td>
             <td><input type="date" name="entrust_date" class="module-input" value="<?= h($copyright_info['entrust_date']) ?>"></td>
-            <td class="module-label">申请方式</td>
-            <td>
-                <?php echo render_select('application_mode', $application_modes, $copyright_info['application_mode']); ?>
-            </td>
-        </tr>
-        <tr>
-            <td class="module-label">业务人员</td>
-            <td>
-                <?php render_select_search_multi('business_user_ids', $users_options, $copyright_info['business_user_ids']); ?>
-            </td>
-            <td class="module-label">申请类型</td>
-            <td>
-                <?php echo render_select('application_type', $application_types, $copyright_info['application_type']); ?>
-            </td>
-            <td class="module-label">国家(地区)</td>
-            <td>
-                <?php echo render_select('country', $countries, $copyright_info['country']); ?>
-            </td>
-        </tr>
-        <tr>
-            <td class="module-label">案件流向</td>
-            <td>
-                <?php echo render_select('case_flow', $case_flows, $copyright_info['case_flow']); ?>
-            </td>
             <td class="module-label">起始阶段</td>
             <td>
                 <?php echo render_select('start_stage', $start_stages, $copyright_info['start_stage']); ?>
@@ -378,13 +375,12 @@ render_select_search_assets();
             <td>
                 <?php echo render_select('is_expedited', $expedited_levels, $copyright_info['is_expedited']); ?>
             </td>
-            <td class="module-label">开卷日</td>
-            <td><input type="date" name="open_date" class="module-input" value="<?= h($copyright_info['open_date']) ?>"></td>
             <td class="module-label">有无材料</td>
             <td>
                 <label><input type="radio" name="is_material_available" value="1" <?= $copyright_info['is_material_available'] ? 'checked' : '' ?>>有</label>
                 <label><input type="radio" name="is_material_available" value="0" <?= !$copyright_info['is_material_available'] ? 'checked' : '' ?>>无</label>
             </td>
+            <td colspan="2"></td>
         </tr>
         <tr>
             <td class="module-label">受理号</td>
@@ -406,7 +402,63 @@ render_select_search_assets();
             <td class="module-label">案件备注</td>
             <td colspan="5"><textarea name="remarks" class="module-textarea" rows="3" style="width:100%;"><?= h($copyright_info['remarks']) ?></textarea></td>
         </tr>
+        <tr>
+            <td colspan="6" style="text-align:center;padding:15px;">
+                <button type="button" id="toggle-advanced-fields" class="btn-mini" style="background:#f0f0f0;border:1px solid #ddd;padding:8px 16px;cursor:pointer;">
+                    <i class="icon-down" style="margin-right:5px;">▼</i>
+                    <span class="toggle-text">展开</span>
+                </button>
+            </td>
+        </tr>
     </table>
+
+    <!-- 可展开/隐藏的高级字段区域 -->
+    <div id="advanced-fields" style="display:none;margin-top:15px;">
+        <!-- <h4 style="margin-bottom:10px;color:#666;border-bottom:1px solid #eee;padding-bottom:5px;">高级选项</h4> -->
+        <table class="module-table" style="width:100%;max-width:1800px;table-layout:fixed;">
+            <colgroup>
+                <col style="width:120px;">
+                <col style="width:220px;">
+                <col style="width:120px;">
+                <col style="width:220px;">
+                <col style="width:120px;">
+                <col style="width:220px;">
+            </colgroup>
+            <tr>
+                <td class="module-label">业务人员</td>
+                <td>
+                    <?php render_select_search_multi('business_user_ids', $users_options, $copyright_info['business_user_ids']); ?>
+                </td>
+                <td class="module-label">申请方式</td>
+                <td>
+                    <?php echo render_select('application_mode', $application_modes, $copyright_info['application_mode']); ?>
+                </td>
+                <td class="module-label">申请类型</td>
+                <td>
+                    <?php echo render_select('application_type', $application_types, $copyright_info['application_type']); ?>
+                </td>
+            </tr>
+            <tr>
+                <td class="module-label">国家(地区)</td>
+                <td>
+                    <?php echo render_select('country', $countries, $copyright_info['country']); ?>
+                </td>
+                <td class="module-label">案件流向</td>
+                <td>
+                    <?php echo render_select('case_flow', $case_flows, $copyright_info['case_flow']); ?>
+                </td>
+                <td class="module-label">案源国</td>
+                <td>
+                    <?php echo render_select('source_country', $source_countries, $copyright_info['source_country']); ?>
+                </td>
+            </tr>
+            <tr>
+                <td class="module-label">开卷日</td>
+                <td><input type="date" name="open_date" class="module-input" value="<?= h($copyright_info['open_date']) ?>"></td>
+                <td colspan="4"></td>
+            </tr>
+        </table>
+    </div>
 </form>
 <!-- </div> -->
 
@@ -416,17 +468,99 @@ render_select_search_assets();
             btnSave = document.querySelector('#copyright-tab-content .btn-save'),
             btnCancel = document.querySelector('#copyright-tab-content .btn-cancel');
 
+        // 展开/隐藏高级字段功能
+        var toggleBtn = document.getElementById('toggle-advanced-fields');
+        var advancedFields = document.getElementById('advanced-fields');
+        var toggleIcon = toggleBtn.querySelector('.icon-down');
+        var toggleText = toggleBtn.querySelector('.toggle-text');
+
+        if (toggleBtn) {
+            toggleBtn.onclick = function() {
+                if (advancedFields.style.display === 'none') {
+                    // 展开
+                    advancedFields.style.display = 'block';
+                    toggleIcon.textContent = '▲';
+                    toggleText.textContent = '隐藏';
+                } else {
+                    // 隐藏
+                    advancedFields.style.display = 'none';
+                    toggleIcon.textContent = '▼';
+                    toggleText.textContent = '展开';
+                }
+            };
+        }
+
         // 保存按钮AJAX提交
         if (btnSave) {
             btnSave.onclick = function() {
-                var required = ['case_name', 'business_dept_id', 'client_id', 'process_item'];
-                for (var i = 0; i < required.length; i++) {
-                    var el = form.querySelector('[name="' + required[i] + '"]');
-                    if (!el || !el.value.trim()) {
-                        alert('请填写所有必填项');
-                        el && el.focus();
-                        return;
+                // 完整的必填字段验证
+                var requiredFields = [{
+                        name: 'case_name',
+                        label: '案件名称',
+                        type: 'input'
+                    },
+                    {
+                        name: 'business_dept_id',
+                        label: '承办部门',
+                        type: 'select'
+                    },
+                    {
+                        name: 'process_item',
+                        label: '处理事项',
+                        type: 'select'
+                    },
+                    {
+                        name: 'client_id',
+                        label: '客户名称',
+                        type: 'select'
+                    },
+
+                    {
+                        name: 'is_subsidy_agent',
+                        label: '是否代办资助',
+                        type: 'radio'
                     }
+                ];
+
+                var missingFields = [];
+                var firstErrorField = null;
+
+                for (var i = 0; i < requiredFields.length; i++) {
+                    var field = requiredFields[i];
+                    var isValid = false;
+
+                    if (field.type === 'input' || field.type === 'select') {
+                        var el = form.querySelector('[name="' + field.name + '"]');
+                        if (el && el.value && el.value.trim()) {
+                            isValid = true;
+                        }
+                        if (!isValid && !firstErrorField) {
+                            firstErrorField = el;
+                        }
+                    } else if (field.type === 'radio') {
+                        var radioEls = form.querySelectorAll('[name="' + field.name + '"]');
+                        for (var j = 0; j < radioEls.length; j++) {
+                            if (radioEls[j].checked) {
+                                isValid = true;
+                                break;
+                            }
+                        }
+                        if (!isValid && !firstErrorField) {
+                            firstErrorField = radioEls[0];
+                        }
+                    }
+
+                    if (!isValid) {
+                        missingFields.push(field.label);
+                    }
+                }
+
+                if (missingFields.length > 0) {
+                    alert('请填写以下必填项：' + missingFields.join('、'));
+                    if (firstErrorField) {
+                        firstErrorField.focus();
+                    }
+                    return;
                 }
                 var fd = new FormData(form);
                 fd.append('action', 'save');

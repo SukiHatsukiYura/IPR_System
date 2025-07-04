@@ -192,6 +192,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         exit;
     }
 
+    // 必填字段验证
+    $required_fields = [
+        'case_name' => '案件名称',
+        'business_dept_id' => '承办部门',
+        'process_item' => '处理事项',
+        'client_id' => '客户名称',
+        'application_type' => '申请类型',
+        'is_allocated' => '是否配案'
+    ];
+
+    $validation_errors = [];
+    foreach ($required_fields as $field => $label) {
+        if ($field === 'is_allocated') {
+            // 特殊处理is_allocated字段，它是radio按钮，值为0或1
+            if (!isset($data[$field]) || ($data[$field] !== '0' && $data[$field] !== '1' && $data[$field] !== 0 && $data[$field] !== 1)) {
+                $validation_errors[] = $label;
+            }
+        } else {
+            if (!isset($data[$field]) || $data[$field] === null || $data[$field] === '' || (is_numeric($data[$field]) && intval($data[$field]) <= 0)) {
+                $validation_errors[] = $label;
+            }
+        }
+    }
+
+    if (!empty($validation_errors)) {
+        echo json_encode([
+            'success' => false,
+            'msg' => '请填写所有必填项：' . implode('、', $validation_errors)
+        ]);
+        exit;
+    }
+
     // 执行更新
     try {
         $data['id'] = $patent_id;
@@ -380,22 +412,26 @@ render_select_search_assets();
             <td>
                 <?php render_select_search('handler_id', $users_options, $patent['handler_id']); ?>
             </td>
-            <td class="module-label">公告号</td>
-            <td><input type="text" name="announcement_no" class="module-input" value="<?= h($patent['announcement_no']) ?>"></td>
+            <td class="module-label">项目负责人</td>
+            <td>
+                <?php render_select_search('project_leader_id', $users_options, $patent['project_leader_id']); ?>
+            </td>
         </tr>
         <tr>
+            <td class="module-label">公告号</td>
+            <td><input type="text" name="announcement_no" class="module-input" value="<?= h($patent['announcement_no']) ?>"></td>
             <td class="module-label">公告日</td>
             <td><input type="date" name="announcement_date" class="module-input" value="<?= h($patent['announcement_date']) ?>"></td>
             <td class="module-label">证书号</td>
             <td><input type="text" name="certificate_no" class="module-input" value="<?= h($patent['certificate_no']) ?>"></td>
-            <td class="module-label">属满日</td>
-            <td><input type="date" name="expire_date" class="module-input" value="<?= h($patent['expire_date']) ?>"></td>
         </tr>
         <tr>
+            <td class="module-label">属满日</td>
+            <td><input type="date" name="expire_date" class="module-input" value="<?= h($patent['expire_date']) ?>"></td>
             <td class="module-label">进入实审日</td>
             <td><input type="date" name="enter_substantive_date" class="module-input" value="<?= h($patent['enter_substantive_date']) ?>"></td>
             <td class="module-label">申请方式</td>
-            <td colspan="3">
+            <td>
                 <select name="application_mode" class="module-input">
                     <option value="">--请选择--</option>
                     <?php foreach ($application_modes as $mode): ?>
@@ -404,6 +440,7 @@ render_select_search_assets();
                 </select>
             </td>
         </tr>
+
         <tr>
             <td class="module-label">案件备注</td>
             <td colspan="5" style="width:100%"><textarea name="remarks" class="module-input" style="min-height:48px;width:100%;resize:vertical;"><?= h($patent['remarks']) ?></textarea></td>
@@ -418,22 +455,91 @@ render_select_search_assets();
                 var form = btnSave.closest('.module-panel').querySelector('form.module-form');
                 if (!form) return;
 
-                var required = ['case_name', 'business_dept_id'];
+                // 定义必填字段
+                var required = ['case_name', 'business_dept_id', 'process_item', 'client_id', 'application_type', 'is_allocated'];
+                var errors = [];
+
+                // 验证所有必填字段
                 for (var i = 0; i < required.length; i++) {
-                    var el = form.querySelector('[name="' + required[i] + '"]');
-                    var val = el ? el.value.trim() : '';
-                    if (el && el.type === 'hidden' && form.querySelector('[name="' + required[i] + '_display"]')) {
-                        val = el.value;
+                    var fieldName = required[i];
+                    var el = form.querySelector('[name="' + fieldName + '"]');
+                    var val = '';
+
+                    // 特殊处理radio按钮
+                    if (fieldName === 'is_allocated') {
+                        var checkedRadio = form.querySelector('[name="' + fieldName + '"]:checked');
+                        val = checkedRadio ? checkedRadio.value : '';
+                    } else {
+                        val = el ? el.value.trim() : '';
+                        // 处理下拉框的隐藏字段
+                        if (el && el.type === 'hidden' && form.querySelector('[name="' + fieldName + '_display"]')) {
+                            val = el.value;
+                        }
                     }
+
                     if (!val) {
-                        var fieldName = form.querySelector('[name="' + required[i] + '_display"]') ?
-                            form.querySelector('[name="' + required[i] + '_display"]').closest('td').previousElementSibling.textContent.replace('*', '').trim() :
-                            required[i];
-                        alert('请填写所有必填项: ' + fieldName);
-                        if (el && el.type !== 'hidden' && el.focus) el.focus();
-                        else if (form.querySelector('[name="' + required[i] + '_display"]')) form.querySelector('[name="' + required[i] + '_display"]').focus();
-                        return;
+                        // 获取字段显示名称
+                        var labelText = '';
+                        if (form.querySelector('[name="' + fieldName + '_display"]')) {
+                            labelText = form.querySelector('[name="' + fieldName + '_display"]').closest('td').previousElementSibling.textContent.replace('*', '').trim();
+                        } else if (el) {
+                            var labelTd = el.closest('td').previousElementSibling;
+                            if (labelTd) {
+                                labelText = labelTd.textContent.replace('*', '').trim();
+                            }
+                        }
+
+                        if (!labelText) {
+                            // 备用显示名称
+                            var displayNames = {
+                                'case_name': '案件名称',
+                                'business_dept_id': '承办部门',
+                                'process_item': '处理事项',
+                                'client_id': '客户名称',
+                                'application_type': '申请类型',
+                                'is_allocated': '是否配案'
+                            };
+                            labelText = displayNames[fieldName] || fieldName;
+                        }
+
+                        errors.push(labelText);
                     }
+                }
+
+                // 如果有错误，显示所有错误
+                if (errors.length > 0) {
+                    alert('请填写所有必填项：' + errors.join('、'));
+                    // 聚焦到第一个错误字段
+                    var firstErrorField = required.find(function(field) {
+                        var val = '';
+                        if (field === 'is_allocated') {
+                            var checkedRadio = form.querySelector('[name="' + field + '"]:checked');
+                            val = checkedRadio ? checkedRadio.value : '';
+                        } else {
+                            var el = form.querySelector('[name="' + field + '"]');
+                            val = el ? el.value.trim() : '';
+                            if (el && el.type === 'hidden' && form.querySelector('[name="' + field + '_display"]')) {
+                                val = el.value;
+                            }
+                        }
+                        return !val;
+                    });
+
+                    if (firstErrorField) {
+                        if (firstErrorField === 'is_allocated') {
+                            // radio按钮聚焦到第一个选项
+                            var firstRadio = form.querySelector('[name="' + firstErrorField + '"]');
+                            if (firstRadio && firstRadio.focus) firstRadio.focus();
+                        } else {
+                            var el = form.querySelector('[name="' + firstErrorField + '"]');
+                            if (el && el.type !== 'hidden' && el.focus) {
+                                el.focus();
+                            } else if (form.querySelector('[name="' + firstErrorField + '_display"]')) {
+                                form.querySelector('[name="' + firstErrorField + '_display"]').focus();
+                            }
+                        }
+                    }
+                    return;
                 }
 
                 var fd = new FormData(form);
