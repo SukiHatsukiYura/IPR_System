@@ -2,6 +2,7 @@
 // 用户登录页面
 session_start();
 include_once 'database.php';
+include_once 'common/functions.php';
 
 // 如果已登录，跳转到首页
 if (isset($_SESSION['user_id'])) {
@@ -22,13 +23,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $stmt->fetch();
         if (!$user) {
             $error = '用户不存在或已停用！';
+            // 记录登录失败日志
+            log_user_login($pdo, 0, $username, 0, '用户不存在或已停用');
         } elseif (strtolower($user['password']) !== strtolower(md5($password))) {
             $error = '密码错误！';
+            // 记录登录失败日志
+            log_user_login($pdo, $user['id'], $username, 0, '密码错误');
         } else {
             // 登录成功
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['role_id'] = $user['role_id'];
+
+            // 记录登录成功日志
+            log_user_login($pdo, $user['id'], $user['username'], 1);
+
             if (isset($_POST['remember'])) {
                 setcookie('remember_username', $username, time() + 30 * 24 * 3600, '/');
             } else {
@@ -168,6 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin-bottom: 10px;
             font-size: 14px;
         }
+
         h1 {
             font-size: 32px;
             color: #333;

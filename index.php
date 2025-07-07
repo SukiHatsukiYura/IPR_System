@@ -266,7 +266,7 @@ include 'database.php';
                     {
                         title: '系统设置',
                         icon: '🛠️',
-                        sub: ['本所信息', '部门设置', '流程设置', '人员设置', '角色设置', '流程邮件设置']
+                        sub: ['本所信息', '部门设置', '流程设置', '人员设置', '角色设置', '流程邮件设置', '日志管理']
                     },
                     {
                         title: '基础数据',
@@ -372,7 +372,7 @@ include 'database.php';
                 [
                     ['basic_info', 'change_password', 'email_settings'],
                     ['task_rules', 'notification_rules', 'document_rules', 'numbering_rules', 'agency_fee_rules', 'third_party_fee_rules', 'email_tag_rules'],
-                    ['firm_info', 'department_settings', 'process_settings', 'personnel_settings', 'role_settings', 'process_email_settings'],
+                    ['firm_info', 'department_settings', 'process_settings', 'personnel_settings', 'role_settings', 'process_email_settings', 'log_management'],
                     ['business_type', 'case_status', 'task_items', 'process_status', 'file_description', 'email_tags', 'fee_types', 'customer_status', 'crm_basic_data']
                 ]
             ];

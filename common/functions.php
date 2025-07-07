@@ -423,3 +423,271 @@ function render_pagination($total, $page, $page_size, $total_pages, $params = []
     $html .= '</form>';
     return $html;
 }
+
+// 记录用户登录日志函数
+function log_user_login($pdo, $user_id, $username, $login_status = 1, $failure_reason = null)
+{
+    try {
+        // 获取用户IP地址
+        $login_ip = get_client_ip();
+
+        // 获取用户代理信息
+        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+
+        // 解析设备类型和浏览器信息
+        $device_info = parse_user_agent($user_agent);
+
+        // 获取会话ID
+        $session_id = session_id();
+
+        // 开始事务
+        $pdo->beginTransaction();
+
+        // 插入登录日志
+        $sql = "INSERT INTO user_login_log (
+            user_id, username, login_time, login_ip, user_agent, 
+            login_status, failure_reason, session_id, device_type, 
+            browser_name, os_name
+        ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        $stmt = $pdo->prepare($sql);
+        $result = $stmt->execute([
+            $user_id,
+            $username,
+            $login_ip,
+            $user_agent,
+            $login_status,
+            $failure_reason,
+            $session_id,
+            $device_info['device_type'],
+            $device_info['browser_name'],
+            $device_info['os_name']
+        ]);
+
+        // 更新登录次数统计
+        if ($result && $user_id > 0) {
+            update_login_stats($pdo, $user_id, $username, $login_status, $login_ip);
+        }
+
+        // 提交事务
+        $pdo->commit();
+
+        return $result;
+    } catch (Exception $e) {
+        // 回滚事务
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        // 记录日志失败不应该影响登录流程，只记录错误
+        error_log("登录日志记录失败: " . $e->getMessage());
+        return false;
+    }
+}
+
+// 获取客户端真实IP地址
+function get_client_ip()
+{
+    $ip = '';
+
+    if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+        $ip = $_SERVER['HTTP_CLIENT_IP'];
+    } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+    } elseif (!empty($_SERVER['HTTP_X_FORWARDED'])) {
+        $ip = $_SERVER['HTTP_X_FORWARDED'];
+    } elseif (!empty($_SERVER['HTTP_FORWARDED_FOR'])) {
+        $ip = $_SERVER['HTTP_FORWARDED_FOR'];
+    } elseif (!empty($_SERVER['HTTP_FORWARDED'])) {
+        $ip = $_SERVER['HTTP_FORWARDED'];
+    } elseif (!empty($_SERVER['REMOTE_ADDR'])) {
+        $ip = $_SERVER['REMOTE_ADDR'];
+    }
+
+    // 处理多个IP的情况（代理链）
+    if (strpos($ip, ',') !== false) {
+        $ip = trim(explode(',', $ip)[0]);
+    }
+
+    // 验证IP格式
+    if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    }
+
+    return $ip;
+}
+
+// 解析用户代理信息
+function parse_user_agent($user_agent)
+{
+    $device_type = 'PC';
+    $browser_name = 'Unknown';
+    $os_name = 'Unknown';
+
+    if (empty($user_agent)) {
+        return [
+            'device_type' => $device_type,
+            'browser_name' => $browser_name,
+            'os_name' => $os_name
+        ];
+    }
+
+    $user_agent = strtolower($user_agent);
+
+    // 检测设备类型
+    if (
+        strpos($user_agent, 'mobile') !== false ||
+        strpos($user_agent, 'android') !== false ||
+        strpos($user_agent, 'iphone') !== false ||
+        strpos($user_agent, 'ipod') !== false
+    ) {
+        $device_type = 'Mobile';
+    } elseif (
+        strpos($user_agent, 'tablet') !== false ||
+        strpos($user_agent, 'ipad') !== false
+    ) {
+        $device_type = 'Tablet';
+    }
+
+    // 检测浏览器
+    if (strpos($user_agent, 'edge') !== false) {
+        $browser_name = 'Edge';
+    } elseif (strpos($user_agent, 'chrome') !== false) {
+        $browser_name = 'Chrome';
+    } elseif (strpos($user_agent, 'firefox') !== false) {
+        $browser_name = 'Firefox';
+    } elseif (strpos($user_agent, 'safari') !== false) {
+        $browser_name = 'Safari';
+    } elseif (strpos($user_agent, 'opera') !== false || strpos($user_agent, 'opr') !== false) {
+        $browser_name = 'Opera';
+    } elseif (strpos($user_agent, 'msie') !== false || strpos($user_agent, 'trident') !== false) {
+        $browser_name = 'IE';
+    }
+
+    // 检测操作系统
+    if (strpos($user_agent, 'windows') !== false) {
+        $os_name = 'Windows';
+    } elseif (strpos($user_agent, 'macintosh') !== false || strpos($user_agent, 'mac os') !== false) {
+        $os_name = 'macOS';
+    } elseif (strpos($user_agent, 'linux') !== false) {
+        $os_name = 'Linux';
+    } elseif (strpos($user_agent, 'android') !== false) {
+        $os_name = 'Android';
+    } elseif (strpos($user_agent, 'iphone') !== false || strpos($user_agent, 'ipad') !== false) {
+        $os_name = 'iOS';
+    }
+
+    return [
+        'device_type' => $device_type,
+        'browser_name' => $browser_name,
+        'os_name' => $os_name
+    ];
+}
+
+// 更新用户登录次数统计
+function update_login_stats($pdo, $user_id, $username, $login_status, $login_ip)
+{
+    try {
+        $current_date = date('Y-m-d');
+        $current_month = date('Y-m');
+
+        // 检查是否已存在统计记录
+        $check_sql = "SELECT id, last_update_date, consecutive_failed_count FROM user_login_stats WHERE user_id = ?";
+        $check_stmt = $pdo->prepare($check_sql);
+        $check_stmt->execute([$user_id]);
+        $stats = $check_stmt->fetch();
+
+        if ($stats) {
+            // 更新现有记录
+            $updates = [];
+            $params = [];
+
+            // 基础更新字段
+            $updates[] = "total_login_count = total_login_count + 1";
+            $updates[] = "last_login_time = NOW()";
+            $updates[] = "last_login_ip = ?";
+            $updates[] = "updated_at = NOW()";
+            $params[] = $login_ip;
+
+            // 根据登录状态更新
+            if ($login_status == 1) {
+                // 登录成功
+                $updates[] = "success_login_count = success_login_count + 1";
+                $updates[] = "last_success_login_time = NOW()";
+                $updates[] = "consecutive_failed_count = 0"; // 重置连续失败次数
+            } else {
+                // 登录失败
+                $updates[] = "failed_login_count = failed_login_count + 1";
+                $updates[] = "last_failed_login_time = NOW()";
+                $updates[] = "consecutive_failed_count = consecutive_failed_count + 1";
+            }
+
+            // 检查是否需要重置今日和本月计数
+            if ($stats['last_update_date'] !== $current_date) {
+                // 跨日了，重置今日计数
+                $updates[] = "today_login_count = 1";
+                $updates[] = "last_update_date = ?";
+                $params[] = $current_date;
+
+                // 检查是否跨月
+                if (substr($stats['last_update_date'], 0, 7) !== $current_month) {
+                    $updates[] = "this_month_login_count = 1";
+                } else {
+                    $updates[] = "this_month_login_count = this_month_login_count + 1";
+                }
+            } else {
+                // 同一天，增加今日和本月计数
+                $updates[] = "today_login_count = today_login_count + 1";
+                $updates[] = "this_month_login_count = this_month_login_count + 1";
+            }
+
+            $params[] = $user_id;
+            $update_sql = "UPDATE user_login_stats SET " . implode(', ', $updates) . " WHERE user_id = ?";
+            $update_stmt = $pdo->prepare($update_sql);
+            $update_stmt->execute($params);
+        } else {
+            // 创建新记录
+            $insert_sql = "INSERT INTO user_login_stats (
+                user_id, username, total_login_count, success_login_count, failed_login_count,
+                last_login_time, last_login_ip, last_success_login_time, last_failed_login_time,
+                consecutive_failed_count, today_login_count, this_month_login_count, last_update_date
+            ) VALUES (?, ?, 1, ?, ?, NOW(), ?, ?, ?, ?, 1, 1, ?)";
+
+            $insert_stmt = $pdo->prepare($insert_sql);
+            $insert_stmt->execute([
+                $user_id,
+                $username,
+                $login_status == 1 ? 1 : 0, // success_login_count
+                $login_status == 0 ? 1 : 0, // failed_login_count
+                $login_ip,
+                $login_status == 1 ? date('Y-m-d H:i:s') : null, // last_success_login_time
+                $login_status == 0 ? date('Y-m-d H:i:s') : null, // last_failed_login_time
+                $login_status == 0 ? 1 : 0, // consecutive_failed_count
+                $current_date
+            ]);
+        }
+
+        return true;
+    } catch (Exception $e) {
+        error_log("登录次数统计更新失败: " . $e->getMessage());
+        throw $e; // 重新抛出异常，让事务回滚
+    }
+}
+
+// 记录用户退出日志
+function log_user_logout($pdo, $user_id, $session_id)
+{
+    try {
+        // 更新最近的登录记录，设置退出时间和会话持续时间
+        $sql = "UPDATE user_login_log SET 
+                logout_time = NOW(),
+                session_duration = TIMESTAMPDIFF(SECOND, login_time, NOW())
+                WHERE user_id = ? AND session_id = ? AND logout_time IS NULL
+                ORDER BY login_time DESC LIMIT 1";
+
+        $stmt = $pdo->prepare($sql);
+        return $stmt->execute([$user_id, $session_id]);
+    } catch (Exception $e) {
+        error_log("退出日志记录失败: " . $e->getMessage());
+        return false;
+    }
+}

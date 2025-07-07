@@ -451,6 +451,7 @@ function render_customer_search($name, $customers, $get_val)
         $current_user_name = $current_user ? $current_user['real_name'] : '未知用户';
         ?>
         <div style="background:#e8f5e8;padding:8px 12px;margin-bottom:10px;border-radius:4px;color:#2e7d32;font-size:14px;">
+            <i class="icon-search"></i> 
             部门案件查询（当前用户：<?php echo htmlspecialchars($current_user_name); ?>）：只显示您作为对应部门的项目负责人的商标案件
         </div>
         <table class="module-table" style="margin-bottom:15px;">

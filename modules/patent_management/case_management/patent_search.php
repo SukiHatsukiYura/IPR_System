@@ -1,5 +1,6 @@
 <?php
 include_once(__DIR__ . '/../../../database.php');
+include_once(__DIR__ . '/../../../common/functions.php'); // 引入通用函数库
 check_access_via_framework();
 session_start();
 if (!isset($_SESSION['user_id'])) {
@@ -57,6 +58,74 @@ $departments = $dept_stmt->fetchAll();
 $customer_stmt = $pdo->prepare("SELECT id, customer_name_cn FROM customer ORDER BY customer_name_cn ASC");
 $customer_stmt->execute();
 $customers = $customer_stmt->fetchAll();
+
+// 处理关注功能AJAX请求
+if (isset($_POST['action']) && $_POST['action'] == 'add_to_follow') {
+    header('Content-Type: application/json');
+
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'msg' => '用户未登录']);
+        exit;
+    }
+
+    $user_id = $_SESSION['user_id'];
+    $case_ids = $_POST['case_ids'] ?? '';
+
+    if (empty($case_ids)) {
+        echo json_encode(['success' => false, 'msg' => '请选择要关注的案件']);
+        exit;
+    }
+
+    try {
+        // 查询用户当前关注的案件
+        $stmt = $pdo->prepare("SELECT followed_case_ids FROM user_patent_follow WHERE user_id = ?");
+        $stmt->execute([$user_id]);
+        $current_follow = $stmt->fetch();
+
+        $new_case_ids = explode(',', $case_ids);
+        $existing_case_ids = [];
+
+        if ($current_follow && !empty($current_follow['followed_case_ids'])) {
+            $existing_case_ids = explode(',', $current_follow['followed_case_ids']);
+        }
+
+        // 分析新增和重复的案件
+        $duplicate_case_ids = array_intersect($existing_case_ids, $new_case_ids);
+        $really_new_case_ids = array_diff($new_case_ids, $existing_case_ids);
+
+        // 合并案件ID，去重
+        $all_case_ids = array_unique(array_merge($existing_case_ids, $new_case_ids));
+        $all_case_ids = array_filter($all_case_ids); // 移除空值
+
+        $followed_case_ids_str = implode(',', $all_case_ids);
+        $follow_count = count($all_case_ids);
+
+        if ($current_follow) {
+            // 更新现有记录
+            $stmt = $pdo->prepare("UPDATE user_patent_follow SET followed_case_ids = ?, follow_count = ?, last_follow_time = NOW() WHERE user_id = ?");
+            $stmt->execute([$followed_case_ids_str, $follow_count, $user_id]);
+        } else {
+            // 插入新记录
+            $stmt = $pdo->prepare("INSERT INTO user_patent_follow (user_id, followed_case_ids, follow_count, last_follow_time) VALUES (?, ?, ?, NOW())");
+            $stmt->execute([$user_id, $followed_case_ids_str, $follow_count]);
+        }
+
+        // 构建详细的提示信息
+        $msg_parts = [];
+        if (count($really_new_case_ids) > 0) {
+            $msg_parts[] = "成功添加 " . count($really_new_case_ids) . " 个新案件到我的关注";
+        }
+        if (count($duplicate_case_ids) > 0) {
+            $msg_parts[] = count($duplicate_case_ids) . " 个案件已在关注列表中";
+        }
+
+        $final_msg = implode("，", $msg_parts);
+        echo json_encode(['success' => true, 'msg' => $final_msg]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'msg' => '添加关注失败: ' . $e->getMessage()]);
+    }
+    exit;
+}
 
 // 处理AJAX请求
 if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
@@ -125,10 +194,11 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
     $patents = $stmt->fetchAll();
     $html = '';
     if (empty($patents)) {
-        $html = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">暂无数据</td></tr>';
+        $html = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">暂无数据</td></tr>';
     } else {
         foreach ($patents as $index => $patent) {
             $html .= '<tr data-id="' . $patent['id'] . '">';
+            $html .= '<td style="text-align:center;"><input type="checkbox" class="case-checkbox" value="' . $patent['id'] . '"></td>';
             $html .= '<td style="text-align:center;">' . ($offset + $index + 1) . '</td>';
             $html .= '<td style="text-align:center;">' . htmlspecialchars($patent['case_code'] ?? '') . '</td>';
             $html .= '<td>' . htmlspecialchars($patent['case_name'] ?? '') . '</td>';
@@ -152,84 +222,39 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
     exit;
 }
 
-function h($v)
-{
-    return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8');
+// 格式化数据为通用下拉框函数所需的关联数组格式
+$departments_options = [];
+foreach ($departments as $dept) {
+    $departments_options[$dept['id']] = $dept['dept_name'];
 }
 
-function render_user_search($name, $users, $get_val)
-{
-    $val = isset($_GET[$name]) ? intval($_GET[$name]) : 0;
-    $display = '';
-    foreach ($users as $u) {
-        if ($u['id'] == $val) {
-            $display = htmlspecialchars($u['real_name'], ENT_QUOTES, 'UTF-8');
-            break;
-        }
-    }
-    return '<div class="module-select-search-box">'
-        . '<input type="text" class="module-input module-select-search-input" name="' . $name . '_display" value="' . $display . '" readonly placeholder="点击选择" data-realname="' . $display . '">'
-        . '<input type="hidden" name="' . $name . '" value="' . ($val ? $val : '') . '">'
-        . '<div class="module-select-search-list" style="display:none;">'
-        .   '<input type="text" class="module-select-search-list-input" placeholder="搜索姓名">'
-        .   '<div class="module-select-search-list-items"></div>'
-        . '</div>'
-        . '</div>';
+$customers_options = [];
+foreach ($customers as $customer) {
+    $customers_options[$customer['id']] = $customer['customer_name_cn'];
 }
 
-function render_dept_search($name, $departments, $get_val)
-{
-    $val = isset($_GET[$name]) ? intval($_GET[$name]) : 0;
-    $display = '';
-    foreach ($departments as $d) {
-        if ($d['id'] == $val) {
-            $display = htmlspecialchars($d['dept_name'], ENT_QUOTES, 'UTF-8');
-            break;
-        }
-    }
-    return '<div class="module-select-search-box">'
-        . '<input type="text" class="module-input module-select-search-input" name="' . $name . '_display" value="' . $display . '" readonly placeholder="点击选择" data-deptname="' . $display . '">'
-        . '<input type="hidden" name="' . $name . '" value="' . ($val ? $val : '') . '">'
-        . '<div class="module-select-search-list" style="display:none;">'
-        .   '<input type="text" class="module-select-search-list-input" placeholder="搜索部门">'
-        .   '<div class="module-select-search-list-items"></div>'
-        . '</div>'
-        . '</div>';
+$users_options = [];
+foreach ($users as $user) {
+    $users_options[$user['id']] = $user['real_name'];
 }
 
-function render_customer_search($name, $customers, $get_val)
-{
-    $val = isset($_GET[$name]) ? intval($_GET[$name]) : 0;
-    $display = '';
-    foreach ($customers as $c) {
-        if ($c['id'] == $val) {
-            $display = htmlspecialchars($c['customer_name_cn'], ENT_QUOTES, 'UTF-8');
-            break;
-        }
-    }
-    return '<div class="module-select-search-box">'
-        . '<input type="text" class="module-input module-select-search-input" name="' . $name . '_display" value="' . $display . '" readonly placeholder="点击选择" data-customername="' . $display . '">'
-        . '<input type="hidden" name="' . $name . '" value="' . ($val ? $val : '') . '">'
-        . '<div class="module-select-search-list" style="display:none;">'
-        .   '<input type="text" class="module-select-search-list-input" placeholder="搜索客户">'
-        .   '<div class="module-select-search-list-items"></div>'
-        . '</div>'
-        . '</div>';
-}
+// 引入搜索下拉框资源
+render_select_search_assets();
 ?>
 <div class="module-panel">
     <div class="module-btns" style="display: flex; flex-direction: column; gap: 10px;">
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button type="button" class="btn-search"><i class="icon-search"></i> 搜索</button>
-        <button type="button" class="btn-reset"><i class="icon-cancel"></i> 重置</button>
-        <button type="button" class="btn-add" onclick="window.parent.openTab ? window.parent.openTab(1, 0, null) : alert('框架导航功能不可用')"><i class="icon-add"></i> 新增专利</button>
-        <button type="button" class="btn-edit" disabled><i class="icon-edit"></i> 修改</button>
+            <button type="button" class="btn-search"><i class="icon-search"></i> 搜索</button>
+            <button type="button" class="btn-reset"><i class="icon-cancel"></i> 重置</button>
+            <button type="button" class="btn-add" onclick="window.parent.openTab ? window.parent.openTab(1, 0, null) : alert('框架导航功能不可用')"><i class="icon-add"></i> 新增专利</button>
+            <button type="button" class="btn-edit" disabled><i class="icon-edit"></i> 修改</button>
+            <button type="button" class="btn-add-follow btn-mini" disabled><i class="icon-add"></i> 添加到我的关注</button>
         </div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button type="button" class="btn-download-template"><i class="icon-save"></i> 下载模板</button>
-        <button type="button" class="btn-batch-import"><i class="icon-add"></i> 批量导入</button>
-        <button type="button" class="btn-download-current"><i class="icon-list"></i> 下载当前案件信息</button>
-        <button type="button" class="btn-batch-update"><i class="icon-edit"></i> 批量修改</button>
+            <button type="button" class="btn-download-template"><i class="icon-save"></i> 下载模板</button>
+            <button type="button" class="btn-batch-import"><i class="icon-add"></i> 批量导入</button>
+            <button type="button" class="btn-download-current"><i class="icon-list"></i> 下载当前案件信息</button>
+            <button type="button" class="btn-batch-update"><i class="icon-edit"></i> 批量修改</button>
         </div>
     </div>
     <form id="search-form" class="module-form" autocomplete="off">
@@ -246,11 +271,11 @@ function render_customer_search($name, $customers, $get_val)
             </tr>
             <tr>
                 <td class="module-label">承办部门：</td>
-                <td><?= render_dept_search('business_dept_id', $departments, '') ?></td>
+                <td><?php render_select_search('business_dept_id', $departments_options, $_GET['business_dept_id'] ?? ''); ?></td>
                 <td class="module-label">客户名称：</td>
-                <td><?= render_customer_search('client_id', $customers, '') ?></td>
+                <td><?php render_select_search('client_id', $customers_options, $_GET['client_id'] ?? ''); ?></td>
                 <td class="module-label">处理人：</td>
-                <td><?= render_user_search('handler_id', $users, '') ?></td>
+                <td><?php render_select_search('handler_id', $users_options, $_GET['handler_id'] ?? ''); ?></td>
             </tr>
             <tr>
                 <td class="module-label">业务类型：</td>
@@ -280,6 +305,7 @@ function render_customer_search($name, $customers, $get_val)
     <table class="module-table">
         <thead>
             <tr style="background:#f2f2f2;">
+                <th style="width:40px;text-align:center;"><input type="checkbox" id="select-all"></th>
                 <th style="width:50px;text-align:center;">序号</th>
                 <th style="width:100px;text-align:center;">我方文号</th>
                 <th style="width:180px;">案件名称</th>
@@ -294,7 +320,7 @@ function render_customer_search($name, $customers, $get_val)
         </thead>
         <tbody id="patent-list">
             <tr>
-                <td colspan="10" style="text-align:center;padding:20px 0;">正在加载数据...</td>
+                <td colspan="11" style="text-align:center;padding:20px 0;">正在加载数据...</td>
             </tr>
         </tbody>
     </table>
@@ -413,6 +439,7 @@ function render_customer_search($name, $customers, $get_val)
             btnSearch = document.querySelector('.btn-search'),
             btnReset = document.querySelector('.btn-reset'),
             btnEdit = document.querySelector('.btn-edit'),
+            btnAddFollow = document.querySelector('.btn-add-follow'),
             btnDownloadTemplate = document.querySelector('.btn-download-template'),
             btnDownloadCurrent = document.querySelector('.btn-download-current'),
             btnBatchImport = document.querySelector('.btn-batch-import'),
@@ -435,16 +462,18 @@ function render_customer_search($name, $customers, $get_val)
             btnLastPage = document.getElementById('btn-last-page'),
             pageInput = document.getElementById('page-input'),
             btnPageJump = document.getElementById('btn-page-jump'),
-            pageSizeSelect = document.getElementById('page-size-select');
+            pageSizeSelect = document.getElementById('page-size-select'),
+            selectAllCheckbox = document.getElementById('select-all');
         var currentPage = 1,
             pageSize = 10,
             totalPages = 1,
             selectedId = null;
 
         window.loadPatentData = function() {
-            patentList.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">正在加载数据...</td></tr>';
+            patentList.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">正在加载数据...</td></tr>';
             selectedId = null;
             btnEdit.disabled = true;
+            btnAddFollow.disabled = true;
             var formData = new FormData(form),
                 params = new URLSearchParams();
             params.append('ajax', 1);
@@ -471,14 +500,15 @@ function render_customer_search($name, $customers, $get_val)
                                 totalPages = parseInt(response.total_pages) || 1;
                                 updatePaginationButtons();
                                 bindTableRowClick();
+                                bindCheckboxEvents();
                             } else {
-                                patentList.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">加载数据失败</td></tr>';
+                                patentList.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">加载数据失败</td></tr>';
                             }
                         } catch (e) {
-                            patentList.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">加载数据失败</td></tr>';
+                            patentList.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">加载数据失败</td></tr>';
                         }
                     } else {
-                        patentList.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">加载数据失败，请稍后重试</td></tr>';
+                        patentList.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">加载数据失败，请稍后重试</td></tr>';
                     }
                 }
             };
@@ -487,13 +517,56 @@ function render_customer_search($name, $customers, $get_val)
 
         function bindTableRowClick() {
             patentList.querySelectorAll('tr[data-id]').forEach(function(row) {
-                row.onclick = function() {
+                row.onclick = function(e) {
+                    // 如果点击的是复选框，不触发行选择
+                    if (e.target.type === 'checkbox') return;
+
                     patentList.querySelectorAll('tr[data-id]').forEach(r => r.classList.remove('module-selected'));
                     this.classList.add('module-selected');
                     selectedId = this.getAttribute('data-id');
                     btnEdit.disabled = false;
                 }
             });
+        }
+
+        function bindCheckboxEvents() {
+            // 全选/取消全选
+            selectAllCheckbox.onchange = function() {
+                var checkboxes = patentList.querySelectorAll('.case-checkbox');
+                checkboxes.forEach(function(checkbox) {
+                    checkbox.checked = selectAllCheckbox.checked;
+                });
+                updateFollowButtonState();
+            };
+
+            // 单个复选框变化
+            patentList.querySelectorAll('.case-checkbox').forEach(function(checkbox) {
+                checkbox.onchange = function() {
+                    updateSelectAllState();
+                    updateFollowButtonState();
+                };
+            });
+        }
+
+        function updateSelectAllState() {
+            var checkboxes = patentList.querySelectorAll('.case-checkbox');
+            var checkedCount = patentList.querySelectorAll('.case-checkbox:checked').length;
+
+            if (checkedCount === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedCount === checkboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+        }
+
+        function updateFollowButtonState() {
+            var checkedCount = patentList.querySelectorAll('.case-checkbox:checked').length;
+            btnAddFollow.disabled = checkedCount === 0;
         }
         btnEdit.onclick = function() {
             if (!selectedId) {
@@ -516,6 +589,53 @@ function render_customer_search($name, $customers, $get_val)
             xhr.send('patent_id=' + selectedId);
         };
 
+        btnAddFollow.onclick = function() {
+            var checkedBoxes = patentList.querySelectorAll('.case-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('请先选择要关注的案件');
+                return;
+            }
+
+            var caseIds = Array.from(checkedBoxes).map(function(checkbox) {
+                return checkbox.value;
+            }).join(',');
+
+            if (confirm('确定要将选中的 ' + checkedBoxes.length + ' 个案件添加到我的关注吗？')) {
+                var xhr = new XMLHttpRequest();
+                var baseUrl = window.location.href.split('?')[0];
+                var followUrl = baseUrl.replace('index.php', '') + 'modules/patent_management/case_management/patent_search.php';
+
+                xhr.open('POST', followUrl, true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            try {
+                                var response = JSON.parse(xhr.responseText);
+                                if (response.success) {
+                                    alert(response.msg);
+                                    // 清除选择状态
+                                    selectAllCheckbox.checked = false;
+                                    selectAllCheckbox.indeterminate = false;
+                                    checkedBoxes.forEach(function(checkbox) {
+                                        checkbox.checked = false;
+                                    });
+                                    updateFollowButtonState();
+                                } else {
+                                    alert('添加关注失败：' + response.msg);
+                                }
+                            } catch (e) {
+                                alert('添加关注失败：服务器响应错误');
+                            }
+                        } else {
+                            alert('添加关注失败：网络错误');
+                        }
+                    }
+                };
+                xhr.send('action=add_to_follow&case_ids=' + encodeURIComponent(caseIds));
+            }
+        };
+
         function updatePaginationButtons() {
             btnFirstPage.disabled = currentPage <= 1;
             btnPrevPage.disabled = currentPage <= 1;
@@ -535,6 +655,9 @@ function render_customer_search($name, $customers, $get_val)
             form.reset();
             document.querySelectorAll('.module-select-search-input').forEach(i => i.value = '');
             document.querySelectorAll('.module-select-search-box input[type=hidden]').forEach(i => i.value = '');
+            // 重置复选框状态
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
             currentPage = 1;
             loadPatentData();
         };
@@ -559,61 +682,7 @@ function render_customer_search($name, $customers, $get_val)
             loadPatentData();
         };
 
-        // 用户搜索下拉
-        var userData = <?php echo json_encode($users, JSON_UNESCAPED_UNICODE); ?>;
-        var deptData = <?php echo json_encode($departments, JSON_UNESCAPED_UNICODE); ?>;
-        var customerData = <?php echo json_encode($customers, JSON_UNESCAPED_UNICODE); ?>;
 
-        function bindUserSearch(box) {
-            var input = box.querySelector('.module-select-search-input');
-            var hidden = box.querySelector('input[type=hidden]');
-            var list = box.querySelector('.module-select-search-list');
-            var searchInput = list.querySelector('.module-select-search-list-input');
-            var itemsDiv = list.querySelector('.module-select-search-list-items');
-            var data = [];
-
-            if (input.hasAttribute('data-realname')) {
-                data = userData;
-            } else if (input.hasAttribute('data-deptname')) {
-                data = deptData;
-            } else if (input.hasAttribute('data-customername')) {
-                data = customerData;
-            }
-
-            function renderList(filter) {
-                var html = '<div class="module-select-search-item" data-id="">--全部--</div>',
-                    found = false;
-                data.forEach(function(item) {
-                    var displayName = item.real_name || item.dept_name || item.customer_name_cn;
-                    if (!filter || displayName.indexOf(filter) !== -1) {
-                        html += '<div class="module-select-search-item" data-id="' + item.id + '">' + displayName + '</div>';
-                        found = true;
-                    }
-                });
-                if (!found && filter) html += '<div class="no-match">无匹配</div>';
-                itemsDiv.innerHTML = html;
-            }
-            input.onclick = function() {
-                renderList('');
-                list.style.display = 'block';
-                searchInput.value = '';
-                searchInput.focus();
-            };
-            searchInput.oninput = function() {
-                renderList(searchInput.value.trim());
-            };
-            document.addEventListener('click', function(e) {
-                if (!box.contains(e.target)) list.style.display = 'none';
-            });
-            itemsDiv.onmousedown = function(e) {
-                var item = e.target.closest('.module-select-search-item');
-                if (item) {
-                    input.value = item.textContent === '--全部--' ? '' : item.textContent;
-                    hidden.value = item.getAttribute('data-id');
-                    list.style.display = 'none';
-                }
-            };
-        }
 
         // 下载模板按钮事件
         btnDownloadTemplate.onclick = function() {
@@ -898,7 +967,33 @@ function render_customer_search($name, $customers, $get_val)
             xhr.send(formData);
         };
 
-        document.querySelectorAll('.module-select-search-box').forEach(bindUserSearch);
+
         loadPatentData();
     })();
 </script>
+
+<style>
+    /* 复选框样式优化 */
+    .case-checkbox,
+    #select-all {
+        cursor: pointer;
+        transform: scale(1.1);
+    }
+
+
+
+    /* 表格行悬停效果 */
+    .module-table tbody tr:hover {
+        background-color: #f5f5f5;
+    }
+
+    /* 选中行样式 */
+    .module-table tbody tr.module-selected {
+        background-color: #e3f2fd !important;
+    }
+
+    /* 全选复选框的半选状态样式 */
+    #select-all:indeterminate {
+        background-color: #29b6b0;
+    }
+</style>

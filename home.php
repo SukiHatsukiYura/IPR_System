@@ -12,11 +12,11 @@
             <div class="update-notification">
                 <div class="update-item">
                     <span class="update-badge new">NEW</span>
-                    <span class="update-text">个人案件-部门查询、案件查询已开放：专利案件、商标案件模块现已开放个人案件导航的部分功能。</span>
+                    <span class="update-text">专利案件、商标案件模块现已开放个人案件导航的全部功能。</span>
                 </div>
                 <div class="update-item">
                     <span class="update-badge new">NEW</span>
-                    <span class="update-text">版权案件：已开放案件管理-文件管理功能，版权案件模块已完全实现。</span>
+                    <span class="update-text">系统管理-系统设置：已开放日志管理功能。</span>
                 </div>
             </div>
         </div>
@@ -26,31 +26,37 @@
     <div class="panel collapsible-panel">
         <div class="panel-header collapsible-header" data-target="features-content">
             <span class="collapse-arrow">&#9660;</span>
-            <h3 class="panel-title"><i class="icon-features"></i> 已开放功能</h3>
+            <h3 class="panel-title"><i class="icon-features"></i> 已开放功能 - 快速导航</h3>
         </div>
         <!-- 改成显示多行，一行3个模块 -->
         <div class="panel-content collapsible-content" id="features-content">
             <div class="features-grid">
-                <div class="feature-category">
+                <div class="feature-category ">
                     <h4 class="category-title">系统管理</h4>
-                    <div class="feature-links">
+                    <div class="feature-links grid-2x2">
                         <a href="javascript:void(0)" onclick="openSystemTab('personal_settings', '个人设置')" class="feature-link">
                             <i class="icon-user"></i>个人设置
                         </a>
                         <a href="javascript:void(0)" onclick="openSystemTab('department_settings', '部门设置')" class="feature-link">
                             <i class="icon-department"></i>部门设置
                         </a>
+                        <a href="javascript:void(0)" onclick="openSystemTab('log_settings', '日志管理')" class="feature-link">
+                            <i class="icon-log"></i>日志管理
+                        </a>
                     </div>
                 </div>
 
                 <div class="feature-category">
                     <h4 class="category-title">客户管理</h4>
-                    <div class="feature-links">
+                    <div class="feature-links grid-2x2">
                         <a href="javascript:void(0)" onclick="openCustomerTab('customer', '客户管理')" class="feature-link">
                             <i class="icon-customer"></i>客户
                         </a>
                         <a href="javascript:void(0)" onclick="openCustomerTab('agency', '代理机构')" class="feature-link">
                             <i class="icon-agency"></i>代理机构
+                        </a>
+                        <a href="javascript:void(0)" onclick="openCustomerTab('contract', '合同管理')" class="feature-link">
+                            <i class="icon-log"></i>合同管理
                         </a>
                     </div>
                 </div>
@@ -63,10 +69,7 @@
                         </a>
                         <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(1, 5, 0) : alert('框架导航功能不可用')" class="feature-link">
                             <i class="icon-search"></i>专利查询
-                        </a>
-                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(1, 1, 4) : alert('框架导航功能不可用')" class="feature-link">
-                            <i class="icon-department"></i>部门案件
-                        </a>
+                        </a>                        
                         <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(1, 1, 5) : alert('框架导航功能不可用')" class="feature-link">
                             <i class="icon-user"></i>个人案件
                         </a>
@@ -82,26 +85,25 @@
                         <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(2, 3, 0) : alert('框架导航功能不可用')" class="feature-link">
                             <i class="icon-search"></i>商标查询
                         </a>
-                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(2, 1, 4) : alert('框架导航功能不可用')" class="feature-link">
-                            <i class="icon-department"></i>部门案件
-                        </a>
                         <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(2, 1, 5) : alert('框架导航功能不可用')" class="feature-link">
                             <i class="icon-user"></i>个人案件
                         </a>
                     </div>
                 </div>
                 <div class="feature-category">
-                    <h4 class="category-title">合同管理</h4>
-                    <div class="feature-links">
-                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(0, 3, 0) : alert('框架导航功能不可用')" class="feature-link">
-                            <i class="icon-add"></i>新增合同
+                    <h4 class="category-title">版权管理</h4>
+                    <div class="feature-links grid-2x2">
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(3, 0, null) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-add"></i>新增版权
                         </a>
-                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(0, 3, 4) : alert('框架导航功能不可用')" class="feature-link">
-                            <i class="icon-list"></i>合同列表
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(3, 1, 0) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-search"></i>版权查询
+                        </a>
+                        <a href="javascript:void(0)" onclick="window.parent.openTab ? window.parent.openTab(3, 1, 1) : alert('框架导航功能不可用')" class="feature-link">
+                            <i class="icon-file"></i>文件管理
                         </a>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
@@ -461,6 +463,14 @@
     .icon-clock::before {
         content: "⏰";
     }
+
+    .icon-log::before {
+        content: "📝";
+    }
+
+    .icon-file::before {
+        content: "📄";
+    }
 </style>
 
 <script>
@@ -498,6 +508,9 @@
             } else if (subModule === 'department_settings') {
                 // 部门设置在系统设置(索引2)下的子项(索引1)
                 window.parent.openTab(7, 2, 1);
+            } else if (subModule === 'log_settings') {
+                // 日志管理在系统设置(索引2)下的子项(索引2)
+                window.parent.openTab(7, 2, 6);
             }
         } else {
             alert('框架导航功能不可用');
@@ -510,10 +523,13 @@
             // 客户管理模块索引为0
             if (subModule === 'customer') {
                 // 客户为索引1
-                window.parent.openTab(0, 1, null);
+                window.parent.openTab(0, 1, 1);
             } else if (subModule === 'agency') {
                 // 代理机构为索引2
-                window.parent.openTab(0, 2, null);
+                window.parent.openTab(0, 2, 1);
+            } else if (subModule === 'contract') {
+                // 合同管理为索引3
+                window.parent.openTab(0, 3, 4);
             }
         } else {
             alert('框架导航功能不可用');

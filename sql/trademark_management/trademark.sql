@@ -332,3 +332,41 @@ CREATE TABLE `trademark_task_attachment` (
     CONSTRAINT `fk_trademark_attachment_upload_user` FOREIGN KEY (`upload_user_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '商标处理事项附件表';
 
+-- 用户商标关注表（使用逗号分隔字段）
+CREATE TABLE `user_trademark_follow` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `user_id` INT(11) NOT NULL COMMENT '用户ID，关联user表',
+    `followed_case_ids` TEXT COMMENT '关注的案件ID列表（逗号分隔）',
+    `follow_count` INT DEFAULT 0 COMMENT '关注案件总数',
+    `last_follow_time` DATETIME DEFAULT NULL COMMENT '最后关注时间',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_follow` (`user_id`),
+    KEY `idx_follow_count` (`follow_count`),
+    KEY `idx_last_follow_time` (`last_follow_time`),
+    CONSTRAINT `fk_user_trademark_follow_user` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '用户商标关注表';
+
+-- 用户商标关注案件状态表
+CREATE TABLE `user_trademark_follow_case_status` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `user_trademark_follow_id` INT(11) NOT NULL COMMENT '关联用户商标关注表ID',
+    `user_id` INT(11) NOT NULL COMMENT '用户ID，关联user表',
+    `trademark_case_id` INT(11) NOT NULL COMMENT '商标案件ID，关联trademark_case_info表',
+    `case_status` ENUM('进行中', '已完成', '已逾期') DEFAULT '进行中' COMMENT '案件状态',
+    `status_note` VARCHAR(500) DEFAULT NULL COMMENT '状态备注',
+    `status_update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '状态更新时间',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_follow_case` (`user_trademark_follow_id`, `trademark_case_id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_trademark_case_id` (`trademark_case_id`),
+    KEY `idx_case_status` (`case_status`),
+    KEY `idx_status_update_time` (`status_update_time`),
+    CONSTRAINT `fk_follow_case_status_follow` FOREIGN KEY (`user_trademark_follow_id`) REFERENCES `user_trademark_follow`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_follow_case_status_user` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_follow_case_status_case` FOREIGN KEY (`trademark_case_id`) REFERENCES `trademark_case_info`(`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '用户商标关注案件状态表';
+

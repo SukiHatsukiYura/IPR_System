@@ -1,5 +1,6 @@
 <?php
 include_once(__DIR__ . '/../../../database.php');
+include_once(__DIR__ . '/../../../common/functions.php'); // 引入通用函数库
 check_access_via_framework();
 session_start();
 if (!isset($_SESSION['user_id'])) {
@@ -55,160 +56,72 @@ $customer_stmt = $pdo->prepare("SELECT id, customer_name_cn FROM customer ORDER 
 $customer_stmt->execute();
 $customers = $customer_stmt->fetchAll();
 
-// 处理图片导入相关AJAX请求
-if (isset($_GET['ajax']) && $_GET['ajax'] == 'image_list') {
-    header('Content-Type: application/json');
-    try {
-        $sql = "SELECT t.id, t.case_code, t.case_name, t.trademark_image_path,
-                (SELECT customer_name_cn FROM customer WHERE id = t.client_id) as client_name
-                FROM trademark_case_info t 
-                ORDER BY t.id DESC";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute();
-        $trademarks = $stmt->fetchAll();
 
-        echo json_encode([
-            'success' => true,
-            'data' => $trademarks
-        ]);
-    } catch (Exception $e) {
-        echo json_encode([
-            'success' => false,
-            'message' => '查询失败：' . $e->getMessage()
-        ]);
+
+// 处理关注功能AJAX请求
+if (isset($_POST['action']) && $_POST['action'] == 'add_to_follow') {
+    header('Content-Type: application/json');
+
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'msg' => '用户未登录']);
+        exit;
     }
-    exit;
-}
 
-// 处理图片上传请求
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload_image') {
-    header('Content-Type: application/json');
+    $user_id = $_SESSION['user_id'];
+    $case_ids = $_POST['case_ids'] ?? '';
 
-    function handle_trademark_image_upload($trademark_id)
-    {
-        if (!isset($_FILES['trademark_image']) || $_FILES['trademark_image']['error'] !== UPLOAD_ERR_OK) {
-            throw new Exception('图片上传失败');
-        }
-
-        $file = $_FILES['trademark_image'];
-        $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-
-        if (!in_array($file['type'], $allowed_types)) {
-            throw new Exception('只支持JPG、PNG、GIF格式的图片');
-        }
-
-        // 创建上传目录
-        $upload_dir = __DIR__ . '/../../../uploads/trademark_images/';
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0755, true);
-        }
-
-        // 生成唯一文件名
-        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-        $filename = 'trademark_' . $trademark_id . '_' . time() . '.' . $extension;
-        $filepath = $upload_dir . $filename;
-
-        if (!move_uploaded_file($file['tmp_name'], $filepath)) {
-            throw new Exception('图片保存失败');
-        }
-
-        return [
-            'path' => 'uploads/trademark_images/' . $filename,
-            'name' => $file['name'],
-            'size' => $file['size'],
-            'type' => $file['type']
-        ];
+    if (empty($case_ids)) {
+        echo json_encode(['success' => false, 'msg' => '请选择要关注的案件']);
+        exit;
     }
 
     try {
-        $trademark_id = intval($_POST['trademark_id'] ?? 0);
-        if ($trademark_id <= 0) {
-            throw new Exception('商标ID无效');
+        // 查询用户当前关注的案件
+        $stmt = $pdo->prepare("SELECT followed_case_ids FROM user_trademark_follow WHERE user_id = ?");
+        $stmt->execute([$user_id]);
+        $current_follow = $stmt->fetch();
+
+        $new_case_ids = explode(',', $case_ids);
+        $existing_case_ids = [];
+
+        if ($current_follow && !empty($current_follow['followed_case_ids'])) {
+            $existing_case_ids = explode(',', $current_follow['followed_case_ids']);
         }
 
-        // 检查商标是否存在
-        $check_stmt = $pdo->prepare("SELECT id FROM trademark_case_info WHERE id = ?");
-        $check_stmt->execute([$trademark_id]);
-        if (!$check_stmt->fetch()) {
-            throw new Exception('商标案件不存在');
-        }
+        // 分析新增和重复的案件
+        $duplicate_case_ids = array_intersect($existing_case_ids, $new_case_ids);
+        $really_new_case_ids = array_diff($new_case_ids, $existing_case_ids);
 
-        // 处理图片上传
-        $image_info = handle_trademark_image_upload($trademark_id);
+        // 合并案件ID，去重
+        $all_case_ids = array_unique(array_merge($existing_case_ids, $new_case_ids));
+        $all_case_ids = array_filter($all_case_ids); // 移除空值
 
-        // 更新数据库
-        $update_sql = "UPDATE trademark_case_info SET 
-                      trademark_image_path = ?, 
-                      trademark_image_name = ?, 
-                      trademark_image_size = ?, 
-                      trademark_image_type = ?,
-                      updated_at = NOW()
-                      WHERE id = ?";
-        $update_stmt = $pdo->prepare($update_sql);
-        $result = $update_stmt->execute([
-            $image_info['path'],
-            $image_info['name'],
-            $image_info['size'],
-            $image_info['type'],
-            $trademark_id
-        ]);
+        $followed_case_ids_str = implode(',', $all_case_ids);
+        $follow_count = count($all_case_ids);
 
-        if ($result) {
-            echo json_encode(['success' => true, 'message' => '图片上传成功']);
+        if ($current_follow) {
+            // 更新现有记录
+            $stmt = $pdo->prepare("UPDATE user_trademark_follow SET followed_case_ids = ?, follow_count = ?, last_follow_time = NOW() WHERE user_id = ?");
+            $stmt->execute([$followed_case_ids_str, $follow_count, $user_id]);
         } else {
-            throw new Exception('数据库更新失败');
+            // 插入新记录
+            $stmt = $pdo->prepare("INSERT INTO user_trademark_follow (user_id, followed_case_ids, follow_count, last_follow_time) VALUES (?, ?, ?, NOW())");
+            $stmt->execute([$user_id, $followed_case_ids_str, $follow_count]);
         }
+
+        // 构建详细的提示信息
+        $msg_parts = [];
+        if (count($really_new_case_ids) > 0) {
+            $msg_parts[] = "成功添加 " . count($really_new_case_ids) . " 个新案件到我的关注";
+        }
+        if (count($duplicate_case_ids) > 0) {
+            $msg_parts[] = count($duplicate_case_ids) . " 个案件已在关注列表中";
+        }
+
+        $final_msg = implode("，", $msg_parts);
+        echo json_encode(['success' => true, 'msg' => $final_msg]);
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-    exit;
-}
-
-// 处理图片删除请求
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_image') {
-    header('Content-Type: application/json');
-
-    try {
-        $trademark_id = intval($_POST['trademark_id'] ?? 0);
-        if ($trademark_id <= 0) {
-            throw new Exception('商标ID无效');
-        }
-
-        // 获取当前图片信息
-        $check_stmt = $pdo->prepare("SELECT id, trademark_image_path FROM trademark_case_info WHERE id = ?");
-        $check_stmt->execute([$trademark_id]);
-        $trademark = $check_stmt->fetch();
-
-        if (!$trademark) {
-            throw new Exception('商标案件不存在');
-        }
-
-        // 删除物理文件
-        if (!empty($trademark['trademark_image_path'])) {
-            $file_path = __DIR__ . '/../../../' . $trademark['trademark_image_path'];
-            if (file_exists($file_path)) {
-                unlink($file_path);
-            }
-        }
-
-        // 清空数据库中的图片信息
-        $update_sql = "UPDATE trademark_case_info SET 
-                      trademark_image_path = NULL, 
-                      trademark_image_name = NULL, 
-                      trademark_image_size = NULL, 
-                      trademark_image_type = NULL,
-                      updated_at = NOW()
-                      WHERE id = ?";
-        $update_stmt = $pdo->prepare($update_sql);
-        $result = $update_stmt->execute([$trademark_id]);
-
-        if ($result) {
-            echo json_encode(['success' => true, 'message' => '图片删除成功']);
-        } else {
-            throw new Exception('数据库更新失败');
-        }
-    } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'msg' => '添加关注失败: ' . $e->getMessage()]);
     }
     exit;
 }
@@ -283,10 +196,11 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
     $trademarks = $stmt->fetchAll();
     $html = '';
     if (empty($trademarks)) {
-        $html = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">暂无数据</td></tr>';
+        $html = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">暂无数据</td></tr>';
     } else {
         foreach ($trademarks as $index => $trademark) {
             $html .= '<tr data-id="' . $trademark['id'] . '">';
+            $html .= '<td style="text-align:center;"><input type="checkbox" class="case-checkbox" value="' . $trademark['id'] . '"></td>';
             $html .= '<td style="text-align:center;">' . ($offset + $index + 1) . '</td>';
             $html .= '<td style="text-align:center;">' . htmlspecialchars($trademark['case_code'] ?? '') . '</td>';
             $html .= '<td>' . htmlspecialchars($trademark['case_name'] ?? '') . '</td>';
@@ -313,70 +227,34 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
     exit;
 }
 
-function h($v)
-{
-    return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8');
+// 格式化数据为通用下拉框函数所需格式
+$departments_options = [];
+$customers_options = [];
+$business_types_options = [];
+$case_statuses_options = [];
+$trademark_classes_options = [];
+
+foreach ($departments as $dept) {
+    $departments_options[$dept['id']] = $dept['dept_name'];
 }
 
-function render_user_search($name, $users, $get_val)
-{
-    $val = isset($_GET[$name]) ? intval($_GET[$name]) : 0;
-    $display = '';
-    foreach ($users as $u) {
-        if ($u['id'] == $val) {
-            $display = htmlspecialchars($u['real_name'], ENT_QUOTES, 'UTF-8');
-            break;
-        }
-    }
-    return '<div class="module-select-search-box">'
-        . '<input type="text" class="module-input module-select-search-input" name="' . $name . '_display" value="' . $display . '" readonly placeholder="点击选择" data-realname="' . $display . '">'
-        . '<input type="hidden" name="' . $name . '" value="' . ($val ? $val : '') . '">'
-        . '<div class="module-select-search-list" style="display:none;">'
-        .   '<input type="text" class="module-select-search-list-input" placeholder="搜索姓名">'
-        .   '<div class="module-select-search-list-items"></div>'
-        . '</div>'
-        . '</div>';
+foreach ($customers as $customer) {
+    $customers_options[$customer['id']] = $customer['customer_name_cn'];
 }
 
-function render_dept_search($name, $departments, $get_val)
-{
-    $val = isset($_GET[$name]) ? intval($_GET[$name]) : 0;
-    $display = '';
-    foreach ($departments as $d) {
-        if ($d['id'] == $val) {
-            $display = htmlspecialchars($d['dept_name'], ENT_QUOTES, 'UTF-8');
-            break;
-        }
-    }
-    return '<div class="module-select-search-box">'
-        . '<input type="text" class="module-input module-select-search-input" name="' . $name . '_display" value="' . $display . '" readonly placeholder="点击选择" data-deptname="' . $display . '">'
-        . '<input type="hidden" name="' . $name . '" value="' . ($val ? $val : '') . '">'
-        . '<div class="module-select-search-list" style="display:none;">'
-        .   '<input type="text" class="module-select-search-list-input" placeholder="搜索部门">'
-        .   '<div class="module-select-search-list-items"></div>'
-        . '</div>'
-        . '</div>';
+foreach ($business_types as $type) {
+    $business_types_options[$type] = $type;
 }
 
-function render_customer_search($name, $customers, $get_val)
-{
-    $val = isset($_GET[$name]) ? intval($_GET[$name]) : 0;
-    $display = '';
-    foreach ($customers as $c) {
-        if ($c['id'] == $val) {
-            $display = htmlspecialchars($c['customer_name_cn'], ENT_QUOTES, 'UTF-8');
-            break;
-        }
-    }
-    return '<div class="module-select-search-box">'
-        . '<input type="text" class="module-input module-select-search-input" name="' . $name . '_display" value="' . $display . '" readonly placeholder="点击选择" data-customername="' . $display . '">'
-        . '<input type="hidden" name="' . $name . '" value="' . ($val ? $val : '') . '">'
-        . '<div class="module-select-search-list" style="display:none;">'
-        .   '<input type="text" class="module-select-search-list-input" placeholder="搜索客户">'
-        .   '<div class="module-select-search-list-items"></div>'
-        . '</div>'
-        . '</div>';
+foreach ($case_statuses as $status) {
+    $case_statuses_options[$status] = $status;
 }
+
+foreach ($trademark_classes as $class) {
+    $trademark_classes_options[$class] = $class;
+}
+// 引入搜索下拉框资源
+render_select_search_assets();
 ?>
 <div class="module-panel">
     <div class="module-btns" style="display: flex; flex-direction: column; gap: 10px;">
@@ -385,6 +263,7 @@ function render_customer_search($name, $customers, $get_val)
             <button type="button" class="btn-reset"><i class="icon-cancel"></i> 重置</button>
             <button type="button" class="btn-add" onclick="window.parent.openTab ? window.parent.openTab(2, 0, null) : alert('框架导航功能不可用')"><i class="icon-add"></i> 新增商标</button>
             <button type="button" class="btn-edit" disabled><i class="icon-edit"></i> 修改</button>
+            <button type="button" class="btn-add-follow btn-mini" disabled><i class="icon-add"></i> 添加到我的关注</button>
         </div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button type="button" class="btn-download-template"><i class="icon-save"></i> 下载模板</button>
@@ -408,9 +287,9 @@ function render_customer_search($name, $customers, $get_val)
             </tr>
             <tr>
                 <td class="module-label">承办部门：</td>
-                <td><?= render_dept_search('business_dept_id', $departments, '') ?></td>
+                <td><?php render_select_search('business_dept_id', $departments_options, $_GET['business_dept_id'] ?? ''); ?></td>
                 <td class="module-label">客户名称：</td>
-                <td><?= render_customer_search('client_id', $customers, '') ?></td>
+                <td><?php render_select_search('client_id', $customers_options, $_GET['client_id'] ?? ''); ?></td>
                 <td class="module-label">商标类别：</td>
                 <td><select name="trademark_class" class="module-input">
                         <option value="">--全部--</option><?php foreach ($trademark_classes as $v): ?><option value="<?= h($v) ?>"><?= h($v) ?></option><?php endforeach; ?>
@@ -444,6 +323,7 @@ function render_customer_search($name, $customers, $get_val)
     <table class="module-table">
         <thead>
             <tr style="background:#f2f2f2;">
+                <th style="width:40px;text-align:center;"><input type="checkbox" id="select-all"></th>
                 <th style="width:50px;text-align:center;">序号</th>
                 <th style="width:100px;text-align:center;">我方文号</th>
                 <th style="width:180px;">商标名称</th>
@@ -459,7 +339,7 @@ function render_customer_search($name, $customers, $get_val)
         </thead>
         <tbody id="trademark-list">
             <tr>
-                <td colspan="10" style="text-align:center;padding:20px 0;">正在加载数据...</td>
+                <td colspan="11" style="text-align:center;padding:20px 0;">正在加载数据...</td>
             </tr>
         </tbody>
     </table>
@@ -615,17 +495,37 @@ function render_customer_search($name, $customers, $get_val)
     </div>
 </div>
 
+<style>
+    /* 半选状态样式 */
+    #select-all:indeterminate {
+        background-color: #29b6b0;
+        border-color: #29b6b0;
+    }
+
+    #select-all:indeterminate::before {
+        content: '−';
+        color: white;
+        font-weight: bold;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+    }
+</style>
+
 <script>
     (function() {
         var form = document.getElementById('search-form'),
             btnSearch = document.querySelector('.btn-search'),
             btnReset = document.querySelector('.btn-reset'),
             btnEdit = document.querySelector('.btn-edit'),
+            btnAddFollow = document.querySelector('.btn-add-follow'),
             btnDownloadTemplate = document.querySelector('.btn-download-template'),
             btnDownloadCurrent = document.querySelector('.btn-download-current'),
             btnBatchImport = document.querySelector('.btn-batch-import'),
             btnBatchUpdate = document.querySelector('.btn-batch-update'),
             btnImageImport = document.querySelector('.btn-image-import'),
+            selectAllCheckbox = document.getElementById('select-all'),
             batchImportModal = document.getElementById('batch-import-modal'),
             batchUpdateModal = document.getElementById('batch-update-modal'),
             imageImportModal = document.getElementById('image-import-modal'),
@@ -656,9 +556,10 @@ function render_customer_search($name, $customers, $get_val)
             selectedId = null;
 
         window.loadTrademarkData = function() {
-            trademarkList.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">正在加载数据...</td></tr>';
+            trademarkList.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">正在加载数据...</td></tr>';
             selectedId = null;
             btnEdit.disabled = true;
+            btnAddFollow.disabled = true;
             var formData = new FormData(form),
                 params = new URLSearchParams();
             params.append('ajax', 1);
@@ -685,14 +586,15 @@ function render_customer_search($name, $customers, $get_val)
                                 totalPages = parseInt(response.total_pages) || 1;
                                 updatePaginationButtons();
                                 bindTableRowClick();
+                                bindCheckboxEvents();
                             } else {
-                                trademarkList.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">加载数据失败</td></tr>';
+                                trademarkList.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">加载数据失败</td></tr>';
                             }
                         } catch (e) {
-                            trademarkList.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">加载数据失败</td></tr>';
+                            trademarkList.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">加载数据失败</td></tr>';
                         }
                     } else {
-                        trademarkList.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px 0;">加载数据失败，请稍后重试</td></tr>';
+                        trademarkList.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px 0;">加载数据失败，请稍后重试</td></tr>';
                     }
                 }
             };
@@ -701,7 +603,12 @@ function render_customer_search($name, $customers, $get_val)
 
         function bindTableRowClick() {
             trademarkList.querySelectorAll('tr[data-id]').forEach(function(row) {
-                row.onclick = function() {
+                row.onclick = function(e) {
+                    // 如果点击的是复选框，不处理行选择
+                    if (e.target.type === 'checkbox') {
+                        return;
+                    }
+
                     trademarkList.querySelectorAll('tr[data-id]').forEach(r => r.classList.remove('module-selected'));
                     this.classList.add('module-selected');
                     selectedId = this.getAttribute('data-id');
@@ -709,6 +616,109 @@ function render_customer_search($name, $customers, $get_val)
                 }
             });
         }
+
+        // 绑定主表格复选框事件
+        function bindCheckboxEvents() {
+            console.log('主表格：开始绑定复选框事件...');
+
+            var checkboxes = trademarkList.querySelectorAll('.case-checkbox');
+            console.log('主表格：找到复选框数量:', checkboxes.length);
+
+            checkboxes.forEach(function(checkbox, index) {
+                checkbox.addEventListener('change', function() {
+                    console.log('主表格：复选框', index + 1, '状态改变，当前选中:', this.checked);
+                    updateSelectAllState();
+                });
+            });
+
+            updateSelectAllState();
+        }
+
+        // 更新全选状态
+        function updateSelectAllState() {
+            var checkboxes = trademarkList.querySelectorAll('.case-checkbox');
+            var checkedBoxes = trademarkList.querySelectorAll('.case-checkbox:checked');
+
+            console.log('主表格：复选框总数:', checkboxes.length, '已选中:', checkedBoxes.length);
+
+            if (checkedBoxes.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+                btnAddFollow.disabled = true;
+                console.log('主表格：状态: 无选择');
+            } else if (checkedBoxes.length === checkboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+                btnAddFollow.disabled = false;
+                console.log('主表格：状态: 全选');
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+                btnAddFollow.disabled = false;
+                console.log('主表格：状态: 部分选择，indeterminate=', selectAllCheckbox.indeterminate);
+            }
+        }
+
+        // 全选复选框事件
+        selectAllCheckbox.addEventListener('change', function() {
+            var checkboxes = trademarkList.querySelectorAll('.case-checkbox');
+            var isChecked = this.checked;
+
+            checkboxes.forEach(function(checkbox) {
+                checkbox.checked = isChecked;
+            });
+
+            updateSelectAllState();
+        });
+
+        // 添加到关注按钮事件
+        btnAddFollow.onclick = function() {
+            var checkedBoxes = trademarkList.querySelectorAll('.case-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('请选择要关注的案件');
+                return;
+            }
+
+            var caseIds = [];
+            checkedBoxes.forEach(function(checkbox) {
+                caseIds.push(checkbox.value);
+            });
+
+            if (confirm('确定要添加选中的 ' + caseIds.length + ' 个案件到我的关注吗？')) {
+                var xhr = new XMLHttpRequest();
+                var baseUrl = window.location.href.split('?')[0];
+                var requestUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/trademark_search.php';
+                xhr.open('POST', requestUrl, true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            try {
+                                var response = JSON.parse(xhr.responseText);
+                                if (response.success) {
+                                    alert(response.msg);
+                                    // 清除所有复选框的选择状态
+                                    var allCheckboxes = trademarkList.querySelectorAll('.case-checkbox');
+                                    allCheckboxes.forEach(function(checkbox) {
+                                        checkbox.checked = false;
+                                    });
+                                    selectAllCheckbox.checked = false;
+                                    selectAllCheckbox.indeterminate = false;
+                                    btnAddFollow.disabled = true;
+                                } else {
+                                    alert('添加关注失败：' + response.msg);
+                                }
+                            } catch (e) {
+                                alert('添加关注失败：服务器响应错误');
+                            }
+                        } else {
+                            alert('添加关注失败：网络错误');
+                        }
+                    }
+                };
+                xhr.send('action=add_to_follow&case_ids=' + caseIds.join(','));
+            }
+        };
 
         btnEdit.onclick = function() {
             if (!selectedId) {
@@ -1047,6 +1057,9 @@ function render_customer_search($name, $customers, $get_val)
             form.reset();
             document.querySelectorAll('.module-select-search-input').forEach(i => i.value = '');
             document.querySelectorAll('.module-select-search-box input[type=hidden]').forEach(i => i.value = '');
+            // 重置复选框状态
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
             currentPage = 1;
             loadTrademarkData();
         };
@@ -1072,61 +1085,7 @@ function render_customer_search($name, $customers, $get_val)
         };
 
         // 用户搜索下拉
-        var userData = <?php echo json_encode($users, JSON_UNESCAPED_UNICODE); ?>;
-        var deptData = <?php echo json_encode($departments, JSON_UNESCAPED_UNICODE); ?>;
-        var customerData = <?php echo json_encode($customers, JSON_UNESCAPED_UNICODE); ?>;
-
-        function bindUserSearch(box) {
-            var input = box.querySelector('.module-select-search-input');
-            var hidden = box.querySelector('input[type=hidden]');
-            var list = box.querySelector('.module-select-search-list');
-            var searchInput = list.querySelector('.module-select-search-list-input');
-            var itemsDiv = list.querySelector('.module-select-search-list-items');
-            var data = [];
-
-            if (input.hasAttribute('data-realname')) {
-                data = userData;
-            } else if (input.hasAttribute('data-deptname')) {
-                data = deptData;
-            } else if (input.hasAttribute('data-customername')) {
-                data = customerData;
-            }
-
-            function renderList(filter) {
-                var html = '<div class="module-select-search-item" data-id="">--全部--</div>',
-                    found = false;
-                data.forEach(function(item) {
-                    var displayName = item.real_name || item.dept_name || item.customer_name_cn;
-                    if (!filter || displayName.indexOf(filter) !== -1) {
-                        html += '<div class="module-select-search-item" data-id="' + item.id + '">' + displayName + '</div>';
-                        found = true;
-                    }
-                });
-                if (!found && filter) html += '<div class="no-match">无匹配</div>';
-                itemsDiv.innerHTML = html;
-            }
-            input.onclick = function() {
-                renderList('');
-                list.style.display = 'block';
-                searchInput.value = '';
-                searchInput.focus();
-            };
-            searchInput.oninput = function() {
-                renderList(searchInput.value.trim());
-            };
-            document.addEventListener('click', function(e) {
-                if (!box.contains(e.target)) list.style.display = 'none';
-            });
-            itemsDiv.onmousedown = function(e) {
-                var item = e.target.closest('.module-select-search-item');
-                if (item) {
-                    input.value = item.textContent === '--全部--' ? '' : item.textContent;
-                    hidden.value = item.getAttribute('data-id');
-                    list.style.display = 'none';
-                }
-            };
-        }
-        document.querySelectorAll('.module-select-search-box').forEach(bindUserSearch);
+        // 通用搜索下拉框已通过render_select_search_assets()自动初始化
 
         // 图片导入相关函数
         function loadTrademarkImageList() {
@@ -1135,7 +1094,7 @@ function render_customer_search($name, $customers, $get_val)
 
             var xhr = new XMLHttpRequest();
             var baseUrl = window.location.href.split('?')[0];
-            var requestUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/trademark_search.php?ajax=image_list';
+            var requestUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/image_upload_api.php?ajax=image_list';
             xhr.open('GET', requestUrl, true);
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
@@ -1227,11 +1186,11 @@ function render_customer_search($name, $customers, $get_val)
             bindDragDropEvents();
 
             // 绑定勾选框事件
-            bindCheckboxEvents();
+            bindImageCheckboxEvents();
         }
 
-        // 绑定勾选框事件
-        function bindCheckboxEvents() {
+        // 绑定图片勾选框事件
+        function bindImageCheckboxEvents() {
             var selectAllCheckbox = document.getElementById('select-all-images');
             var imageCheckboxes = document.querySelectorAll('.image-checkbox');
 
@@ -1508,7 +1467,7 @@ function render_customer_search($name, $customers, $get_val)
                 // 发送删除请求
                 var xhr = new XMLHttpRequest();
                 var baseUrl = window.location.href.split('?')[0];
-                var requestUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/trademark_search.php';
+                var requestUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/image_upload_api.php';
                 xhr.open('POST', requestUrl, true);
                 xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
 
@@ -1589,7 +1548,7 @@ function render_customer_search($name, $customers, $get_val)
 
             var xhr = new XMLHttpRequest();
             var baseUrl = window.location.href.split('?')[0];
-            var uploadUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/trademark_search.php';
+            var uploadUrl = baseUrl.replace('index.php', '') + 'modules/trademark_management/case_management/image_upload_api.php';
             xhr.open('POST', uploadUrl, true);
 
             xhr.onload = function() {
