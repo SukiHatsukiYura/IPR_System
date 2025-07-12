@@ -718,3 +718,45 @@
     cursor: pointer;
     color: #999;
 }
+
+/* 信息提示条样式 */
+.module-notice {
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+}
+
+.module-notice i {
+    margin-right: 6px;
+}
+
+/* 成功提示 - 绿色 */
+.module-notice-success {
+    background: #e8f5e8;
+    color: #2e7d32;
+    border-left: 4px solid #4caf50;
+}
+
+/* 信息提示 - 蓝色 */
+.module-notice-info {
+    background: #e3f2fd;
+    color: #1565c0;
+    border-left: 4px solid #2196f3;
+}
+
+/* 警告提示 - 橙色 */
+.module-notice-warning {
+    background: #fff3e0;
+    color: #e65100;
+    border-left: 4px solid #ff9800;
+}
+
+/* 错误提示 - 红色 */
+.module-notice-error {
+    background: #ffebee;
+    color: #c62828;
+    border-left: 4px solid #f44336;
+}

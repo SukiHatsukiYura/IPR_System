@@ -383,9 +383,7 @@ render_select_search_assets();
     $current_user = $current_user_stmt->fetch();
     $current_user_name = $current_user ? $current_user['real_name'] : '未知用户';
     ?>
-    <div style="background:#e8f5e8;padding:8px 12px;margin-bottom:10px;border-radius:4px;color:#2e7d32;font-size:14px;">
-        <i class="icon-search"></i> 我的关注（当前用户：<?= htmlspecialchars($current_user_name) ?>）：只显示您关注的商标案件
-    </div>
+    <?php render_info_notice("我的关注（当前用户：" . $current_user_name . "）：只显示您关注的商标案件", 'success', 'icon-search'); ?>
     <form id="search-form" class="module-form" autocomplete="off">
         <input type="hidden" name="page" value="1">
         <input type="hidden" name="page_size" value="10">
@@ -739,6 +737,11 @@ render_select_search_assets();
                 alert('请先选择要修改的商标');
                 return;
             }
+            // 记录来源页面信息
+            sessionStorage.setItem('trademark_edit_source_module', '2');
+            sessionStorage.setItem('trademark_edit_source_menu', '1');
+            sessionStorage.setItem('trademark_edit_source_submenu', '3');
+
             var xhr = new XMLHttpRequest();
             xhr.open('POST', 'modules/trademark_management/case_management/set_edit_trademark.php', true);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');

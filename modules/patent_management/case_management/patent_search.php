@@ -573,6 +573,11 @@ render_select_search_assets();
                 alert('请先选择要修改的专利');
                 return;
             }
+            // 记录来源页面信息
+            sessionStorage.setItem('patent_edit_source_module', '1');
+            sessionStorage.setItem('patent_edit_source_menu', '5');
+            sessionStorage.setItem('patent_edit_source_submenu', '0');
+
             var xhr = new XMLHttpRequest();
             xhr.open('POST', 'modules/patent_management/case_management/set_edit_patent.php', true);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');

@@ -1,5 +1,6 @@
 <?php
 include_once(__DIR__ . '/../../../database.php');
+include_once(__DIR__ . '/../../../common/functions.php');
 check_access_via_framework();
 session_start();
 if (!isset($_SESSION['user_id'])) {
@@ -450,10 +451,7 @@ function render_customer_search($name, $customers, $get_val)
         $current_user = $current_user_stmt->fetch();
         $current_user_name = $current_user ? $current_user['real_name'] : '未知用户';
         ?>
-        <div style="background:#e8f5e8;padding:8px 12px;margin-bottom:10px;border-radius:4px;color:#2e7d32;font-size:14px;">
-            <i class="icon-search"></i> 
-            部门案件查询（当前用户：<?php echo htmlspecialchars($current_user_name); ?>）：只显示您作为对应部门的项目负责人的商标案件
-        </div>
+        <?php render_info_notice("部门案件查询（当前用户：" . $current_user_name . "）：只显示您作为对应部门的项目负责人的商标案件", 'success', 'icon-search'); ?>
         <table class="module-table" style="margin-bottom:15px;">
             <tr>
                 <td class="module-label">我方文号：</td>
@@ -780,6 +778,12 @@ function render_customer_search($name, $customers, $get_val)
                 alert('请先选择要修改的商标');
                 return;
             }
+
+            // 记录来源页面信息
+            sessionStorage.setItem('trademark_edit_source_module', '2');
+            sessionStorage.setItem('trademark_edit_source_menu', '1');
+            sessionStorage.setItem('trademark_edit_source_submenu', '4');
+
             var xhr = new XMLHttpRequest();
             xhr.open('POST', 'modules/trademark_management/case_management/set_edit_trademark.php', true);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');

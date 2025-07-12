@@ -79,6 +79,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare($sql);
             $result = $stmt->execute($data);
 
+            // 如果是新增处理事项且保存成功，自动创建递交状态记录
+            if ($result && $task_id == 0) {
+                try {
+                    $new_task_id = $pdo->lastInsertId();
+
+                    // 检查是否已存在递交状态记录
+                    $check_stmt = $pdo->prepare("SELECT id FROM trademark_case_submission_status WHERE trademark_case_info_id = ? AND trademark_case_task_id = ?");
+                    $check_stmt->execute([$trademark_id, $new_task_id]);
+
+                    if (!$check_stmt->fetch()) {
+                        // 创建递交状态记录，默认为"待处理"
+                        $submission_stmt = $pdo->prepare("INSERT INTO trademark_case_submission_status (trademark_case_info_id, trademark_case_task_id, submission_status, created_at, updated_at) VALUES (?, ?, '待处理', NOW(), NOW())");
+                        $submission_stmt->execute([$trademark_id, $new_task_id]);
+                    }
+                } catch (Exception $e) {
+                    // 递交状态创建失败不影响处理事项的保存
+                    error_log("创建递交状态记录失败: " . $e->getMessage());
+                }
+            }
+
             echo json_encode(['success' => $result, 'msg' => $result ? null : '保存失败']);
         } catch (PDOException $e) {
             echo json_encode(['success' => false, 'msg' => '数据库异常: ' . $e->getMessage()]);
@@ -92,11 +112,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // 删除处理事项
         $task_id = intval($_POST['task_id']);
         try {
+            $pdo->beginTransaction();
+
+            // 先删除对应的递交状态记录
+            $submission_stmt = $pdo->prepare("DELETE FROM trademark_case_submission_status WHERE trademark_case_task_id = ?");
+            $submission_stmt->execute([$task_id]);
+
+            // 再删除处理事项
             $stmt = $pdo->prepare("DELETE FROM trademark_case_task WHERE id = ?");
             $result = $stmt->execute([$task_id]);
+
+            $pdo->commit();
             echo json_encode(['success' => $result, 'msg' => $result ? null : '删除失败']);
         } catch (PDOException $e) {
+            $pdo->rollBack();
             echo json_encode(['success' => false, 'msg' => '数据库异常: ' . $e->getMessage()]);
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            echo json_encode(['success' => false, 'msg' => '系统异常: ' . $e->getMessage()]);
         }
         exit;
     }
@@ -558,8 +591,18 @@ render_select_search_assets();
             // 获取当前tab的ID（商标编辑tab）
             var currentTabId = getCurrentTabId();
 
-            // 打开商标查询页面（商标管理-案件管理-商标查询）
-            window.parent.openTab(2, 3, 0);
+            // 获取来源页面信息，如果没有则默认返回商标查询页面
+            var sourceModule = sessionStorage.getItem('trademark_edit_source_module') || '2';
+            var sourceMenu = sessionStorage.getItem('trademark_edit_source_menu') || '3';
+            var sourceSubMenu = sessionStorage.getItem('trademark_edit_source_submenu') || '0';
+
+            // 清除来源页面信息
+            sessionStorage.removeItem('trademark_edit_source_module');
+            sessionStorage.removeItem('trademark_edit_source_menu');
+            sessionStorage.removeItem('trademark_edit_source_submenu');
+
+            // 根据来源页面返回到对应页面
+            window.parent.openTab(parseInt(sourceModule), parseInt(sourceMenu), sourceSubMenu === 'null' ? null : parseInt(sourceSubMenu));
 
             // 关闭当前的商标编辑tab
             if (currentTabId) {

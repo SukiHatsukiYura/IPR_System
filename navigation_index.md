@@ -250,7 +250,7 @@
 
 - 首页: home => home.php
 
-### 编辑页面（通过 set_edit*.php 设置后跳转）
+### 编辑页面（通过 set_edit\*.php 设置后跳转）
 
 - 专利编辑: (1, 6, null) => modules/patent_management/edit_patent.php
 - 商标编辑: (2, 4, null) => modules/trademark_management/edit_trademark.php

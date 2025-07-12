@@ -14,7 +14,7 @@ if ($isLocalorserver == 1) {
     $DB_PASS = 'windowsX999';  // 数据库密码，请替换为实际密码
 }
 // 版本号
-$version = '1.5.0';
+$version = '1.6.0';
 
 try {
     $pdo = new PDO(

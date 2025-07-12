@@ -691,3 +691,29 @@ function log_user_logout($pdo, $user_id, $session_id)
         return false;
     }
 }
+
+/**
+ * 渲染信息提示条
+ * @param string $message 提示信息内容
+ * @param string $type 提示类型 (success/info/warning/error)
+ * @param string $icon 图标类名 (可选，如 'icon-search', 'icon-list' 等)
+ * @return void
+ */
+function render_info_notice($message, $type = 'info', $icon = null)
+{
+    $type_classes = [
+        'success' => 'module-notice-success',
+        'info' => 'module-notice-info',
+        'warning' => 'module-notice-warning',
+        'error' => 'module-notice-error'
+    ];
+
+    $class = isset($type_classes[$type]) ? $type_classes[$type] : $type_classes['info'];
+
+    echo '<div class="module-notice ' . $class . '">';
+    if ($icon) {
+        echo '<i class="' . htmlspecialchars($icon) . '"></i> ';
+    }
+    echo htmlspecialchars($message);
+    echo '</div>';
+}

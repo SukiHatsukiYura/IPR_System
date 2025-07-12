@@ -58,15 +58,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             if ($task_id > 0) {
-                // 编辑
+                // 编辑处理事项
                 $data['modifier_id'] = $current_user_id;
                 $data['modification_date'] = $current_date;
                 $data['task_id'] = $task_id;
                 $set[] = "modifier_id = :modifier_id";
                 $set[] = "modification_date = :modification_date";
                 $sql = "UPDATE patent_case_task SET " . implode(',', $set) . " WHERE id = :task_id";
+
+                $stmt = $pdo->prepare($sql);
+                $result = $stmt->execute($data);
+
+                if ($result) {
+                    // 更新对应的核稿状态记录中的核稿人
+                    $reviewer_id = !empty($data['supervisor_id']) ? $data['supervisor_id'] : null;
+                    $review_update_sql = "UPDATE patent_case_review_status SET reviewer_id = ? WHERE patent_case_task_id = ?";
+                    $review_update_stmt = $pdo->prepare($review_update_sql);
+                    $review_update_stmt->execute([$reviewer_id, $task_id]);
+                }
+
+                echo json_encode(['success' => $result, 'msg' => $result ? null : '保存失败']);
             } else {
-                // 新增
+                // 新增处理事项
                 $data['patent_case_info_id'] = $patent_id;
                 $data['creator_id'] = $current_user_id;
                 $data['creation_date'] = $current_date;
@@ -74,12 +87,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $set[] = "creator_id = :creator_id";
                 $set[] = "creation_date = :creation_date";
                 $sql = "INSERT INTO patent_case_task SET " . implode(',', $set);
+
+                $stmt = $pdo->prepare($sql);
+                $result = $stmt->execute($data);
+
+                if ($result) {
+                    // 获取新插入的处理事项ID
+                    $new_task_id = $pdo->lastInsertId();
+
+                    // 同时向patent_case_review_status表插入一条草稿状态记录
+                    $review_data = [
+                        'patent_case_info_id' => $patent_id,
+                        'patent_case_task_id' => $new_task_id,
+                        'review_status' => '草稿',
+                        'reviewer_id' => null
+                    ];
+
+                    // 如果有核稿人，则关联核稿人
+                    if (!empty($data['supervisor_id'])) {
+                        $review_data['reviewer_id'] = $data['supervisor_id'];
+                    }
+
+                    $review_sql = "INSERT INTO patent_case_review_status (patent_case_info_id, patent_case_task_id, review_status, reviewer_id) VALUES (:patent_case_info_id, :patent_case_task_id, :review_status, :reviewer_id)";
+                    $review_stmt = $pdo->prepare($review_sql);
+                    $review_stmt->execute($review_data);
+                }
+
+                echo json_encode(['success' => $result, 'msg' => $result ? null : '保存失败']);
             }
-
-            $stmt = $pdo->prepare($sql);
-            $result = $stmt->execute($data);
-
-            echo json_encode(['success' => $result, 'msg' => $result ? null : '保存失败']);
         } catch (PDOException $e) {
             echo json_encode(['success' => false, 'msg' => '数据库异常: ' . $e->getMessage()]);
         } catch (Exception $e) {
@@ -92,6 +127,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // 删除处理事项
         $task_id = intval($_POST['task_id']);
         try {
+            // 先删除对应的核稿状态记录
+            $review_stmt = $pdo->prepare("DELETE FROM patent_case_review_status WHERE patent_case_task_id = ?");
+            $review_stmt->execute([$task_id]);
+
+            // 再删除处理事项
             $stmt = $pdo->prepare("DELETE FROM patent_case_task WHERE id = ?");
             $result = $stmt->execute([$task_id]);
             echo json_encode(['success' => $result, 'msg' => $result ? null : '删除失败']);
@@ -312,7 +352,7 @@ render_select_search_assets();
     <div style="margin-top:20px;border-top:2px solid #e0e0e0;padding-top:15px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <h4 style="margin:0;color:#333;">案件处理事项</h4>
-            <button type="button" class="btn-mini" onclick="openTaskModal()"><i class="icon-add"></i> 新增处理事项</button>
+            <button type="button" class="btn-mini" onclick="openAddTaskModal()"><i class="icon-add"></i> 新增处理事项</button>
         </div>
 
         <table class="module-table" style="width:100%;">
@@ -365,19 +405,17 @@ render_select_search_assets();
     </div>
 </div>
 
-<!-- 处理事项编辑模态框 -->
-
-<div id="task-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;">
+<!-- 新建处理事项模态框 -->
+<div id="add-task-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;">
     <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:8px;padding:20px;width:90%;max-width:800px;max-height:90%;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid #eee;padding-bottom:10px;">
-            <h4 style="margin:0;" id="modal-title">新增处理事项</h4>
-            <button type="button" onclick="closeTaskModal()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+            <h4 style="margin:0;">新增处理事项</h4>
+            <button type="button" onclick="closeAddTaskModal()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
         </div>
 
-        <form id="task-form">
+        <form id="add-task-form">
             <input type="hidden" name="action" value="save_task">
             <input type="hidden" name="patent_case_info_id" value="<?= $patent_id ?>">
-            <input type="hidden" name="task_id" id="task-id">
 
             <table class="module-table" style="width:100%;">
                 <tr>
@@ -466,7 +504,153 @@ render_select_search_assets();
 
             <div style="text-align:center;margin-top:20px;">
                 <button type="submit" class="btn-mini">保存</button>
-                <button type="button" onclick="closeTaskModal()" class="btn-mini">取消</button>
+                <button type="button" onclick="closeAddTaskModal()" class="btn-mini">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 编辑处理事项模态框 -->
+<div id="edit-task-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:8px;padding:20px;width:90%;max-width:800px;max-height:90%;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid #eee;padding-bottom:10px;">
+            <h4 style="margin:0;">编辑处理事项</h4>
+            <button type="button" onclick="closeEditTaskModal()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+
+        <form id="edit-task-form">
+            <input type="hidden" name="action" value="save_task">
+            <input type="hidden" name="patent_case_info_id" value="<?= $patent_id ?>">
+            <input type="hidden" name="task_id" id="edit-task-id">
+
+            <table class="module-table" style="width:100%;">
+                <tr>
+                    <td class="module-label module-req">处理事项</td>
+                    <td><input type="text" name="task_item" class="module-input" style="background:#fff;" required></td>
+                    <td class="module-label">案件阶段</td>
+                    <td><input type="text" name="case_stage" class="module-input" style="background:#fff;"></td>
+                </tr>
+                <tr>
+                    <td class="module-label">处理状态</td>
+                    <td>
+                        <select name="task_status" class="module-input" style="background:#fff;">
+                            <option value="">请选择</option>
+                            <option value="完成">完成</option>
+                            <option value="配案中">配案中</option>
+                            <option value="撰写中">撰写中</option>
+                            <option value="递交中">递交中</option>
+                            <option value="内部审核">内部审核</option>
+                            <option value="外部审核">外部审核</option>
+                            <option value="暂停/客户延期">暂停/客户延期</option>
+                            <option value="结案">结案</option>
+                        </select>
+                    </td>
+                    <td class="module-label">处理事项系数</td>
+                    <td>
+                        <select name="task_rule_count" class="module-input" style="background:#fff;">
+                            <option value="">请选择</option>
+                            <option value="实质">实质</option>
+                            <option value="非实质">非实质</option>
+                            <option value="形式">形式</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="module-label">内部期限</td>
+                    <td><input type="date" name="internal_deadline" class="module-input" style="background:#fff;"></td>
+                    <td class="module-label">客户期限</td>
+                    <td><input type="date" name="client_deadline" class="module-input" style="background:#fff;"></td>
+                </tr>
+                <tr>
+                    <td class="module-label">官方期限</td>
+                    <td><input type="date" name="official_deadline" class="module-input" style="background:#fff;"></td>
+                    <td class="module-label">处理人</td>
+                    <td><?php render_select_search('handler_id', $users_options, ''); ?></td>
+                </tr>
+                <tr>
+                    <td class="module-label">对外处理人</td>
+                    <td><?php render_select_search('external_handler_id', $users_options, ''); ?></td>
+                    <td class="module-label">核稿人</td>
+                    <td><?php render_select_search('supervisor_id', $users_options, ''); ?></td>
+                </tr>
+                <tr>
+                    <td class="module-label">初稿日</td>
+                    <td><input type="date" name="first_draft_date" class="module-input" style="background:#fff;"></td>
+                    <td class="module-label">定稿日</td>
+                    <td><input type="date" name="final_draft_date" class="module-input" style="background:#fff;"></td>
+                </tr>
+                <tr>
+                    <td class="module-label">返稿日</td>
+                    <td><input type="date" name="return_date" class="module-input" style="background:#fff;"></td>
+                    <td class="module-label">完成日</td>
+                    <td><input type="date" name="completion_date" class="module-input" style="background:#fff;"></td>
+                </tr>
+                <tr>
+                    <td class="module-label">送合作所日</td>
+                    <td><input type="date" name="send_to_firm_date" class="module-input" style="background:#fff;"></td>
+                    <td class="module-label">内部定稿日</td>
+                    <td><input type="date" name="internal_final_date" class="module-input" style="background:#fff;"></td>
+                </tr>
+                <tr>
+                    <td class="module-label">翻译字数</td>
+                    <td><input type="number" name="translation_word_count" class="module-input" style="background:#fff;"></td>
+                    <td class="module-label">合同编号</td>
+                    <td><input type="text" name="contract_number" class="module-input" style="background:#fff;"></td>
+                </tr>
+                <tr>
+                    <td class="module-label">是否紧急</td>
+                    <td>
+                        <label><input type="radio" name="is_urgent" value="1"> 是</label>
+                        <label><input type="radio" name="is_urgent" value="0" checked> 否</label>
+                    </td>
+                    <td class="module-label">备注</td>
+                    <td><textarea name="remarks" class="module-textarea" style="background:#fff;"></textarea></td>
+                </tr>
+                <tr id="file-upload-row">
+                    <td class="module-label">上传附件</td>
+                    <td colspan="3">
+                        <div style="margin-bottom:8px;">
+                            <label>申请书：</label>
+                            <input type="text" id="file-name-application" placeholder="文件命名（可选）" style="width:120px;">
+                            <input type="file" id="file-application" style="display:inline-block;width:auto;">
+                            <button type="button" class="btn-mini" id="btn-upload-application">上传</button>
+                            <div id="list-application" style="margin-top:4px;"></div>
+                        </div>
+                        <div style="margin-bottom:8px;">
+                            <label>说明书：</label>
+                            <input type="text" id="file-name-specification" placeholder="文件命名（可选）" style="width:120px;">
+                            <input type="file" id="file-specification" style="display:inline-block;width:auto;">
+                            <button type="button" class="btn-mini" id="btn-upload-specification">上传</button>
+                            <div id="list-specification" style="margin-top:4px;"></div>
+                        </div>
+                        <div style="margin-bottom:8px;">
+                            <label>权利要求书：</label>
+                            <input type="text" id="file-name-claims" placeholder="文件命名（可选）" style="width:120px;">
+                            <input type="file" id="file-claims" style="display:inline-block;width:auto;">
+                            <button type="button" class="btn-mini" id="btn-upload-claims">上传</button>
+                            <div id="list-claims" style="margin-top:4px;"></div>
+                        </div>
+                        <div style="margin-bottom:8px;">
+                            <label>附图：</label>
+                            <input type="text" id="file-name-drawings" placeholder="文件命名（可选）" style="width:120px;">
+                            <input type="file" id="file-drawings" style="display:inline-block;width:auto;">
+                            <button type="button" class="btn-mini" id="btn-upload-drawings">上传</button>
+                            <div id="list-drawings" style="margin-top:4px;"></div>
+                        </div>
+                        <div>
+                            <label>其他：</label>
+                            <input type="text" id="file-name-other" placeholder="文件命名（可选，所有文件同名）" style="width:120px;">
+                            <input type="file" id="file-other" multiple style="display:inline-block;width:auto;">
+                            <button type="button" class="btn-mini" id="btn-upload-other">上传</button>
+                            <div id="list-other" style="margin-top:4px;"></div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <div style="text-align:center;margin-top:20px;">
+                <button type="submit" class="btn-mini">保存</button>
+                <button type="button" onclick="closeEditTaskModal()" class="btn-mini">取消</button>
             </div>
         </form>
     </div>
@@ -549,107 +733,106 @@ render_select_search_assets();
     })();
 
     // 处理事项相关函数
-    function openTaskModal(taskId) {
-        // 动态设置模态框标题
-        var modalTitle = document.getElementById('modal-title');
-        if (taskId) {
-            modalTitle.textContent = '编辑处理事项';
-        } else {
-            modalTitle.textContent = '新增处理事项';
-        }
-
-        document.getElementById('task-modal').style.display = 'flex';
-
-        if (taskId) {
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', 'modules/patent_management/edit_patent.php', true);
-            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        try {
-                            var response = JSON.parse(xhr.responseText);
-                            if (response.success) {
-                                var task = response.data;
-
-                                // 安全地设置字段值的函数
-                                function setFieldValue(selector, value) {
-                                    var element = document.querySelector(selector);
-                                    if (element) {
-                                        element.value = value || '';
-                                    }
-                                }
-
-                                // 填充基本字段
-                                setFieldValue('input[name="task_id"]', task.id);
-                                setFieldValue('input[name="task_item"]', task.task_item);
-                                setFieldValue('select[name="case_stage"]', task.case_stage);
-                                setFieldValue('select[name="task_status"]', task.task_status);
-                                setFieldValue('select[name="task_rule_count"]', task.task_rule_count);
-                                setFieldValue('input[name="internal_deadline"]', task.internal_deadline);
-                                setFieldValue('input[name="client_deadline"]', task.client_deadline);
-                                setFieldValue('input[name="official_deadline"]', task.official_deadline);
-                                setFieldValue('input[name="first_draft_date"]', task.first_draft_date);
-                                setFieldValue('input[name="final_draft_date"]', task.final_draft_date);
-                                setFieldValue('input[name="return_date"]', task.return_date);
-                                setFieldValue('input[name="completion_date"]', task.completion_date);
-                                setFieldValue('input[name="send_to_firm_date"]', task.send_to_firm_date);
-                                setFieldValue('input[name="internal_final_date"]', task.internal_final_date);
-                                setFieldValue('input[name="translation_word_count"]', task.translation_word_count);
-                                setFieldValue('input[name="contract_number"]', task.contract_number);
-                                setFieldValue('textarea[name="remarks"]', task.remarks);
-
-                                // 处理下拉搜索框 - 使用查询返回的用户名称
-                                if (task.handler_id) {
-                                    setFieldValue('input[name="handler_id"]', task.handler_id);
-                                    setFieldValue('input[name="handler_id_display"]', task.handler_name || '');
-                                }
-                                if (task.external_handler_id) {
-                                    setFieldValue('input[name="external_handler_id"]', task.external_handler_id);
-                                    setFieldValue('input[name="external_handler_id_display"]', task.external_handler_name || '');
-                                }
-                                if (task.supervisor_id) {
-                                    setFieldValue('input[name="supervisor_id"]', task.supervisor_id);
-                                    setFieldValue('input[name="supervisor_id_display"]', task.supervisor_name || '');
-                                }
-
-                                // 处理单选框
-                                var urgentRadios = document.querySelectorAll('input[name="is_urgent"]');
-                                urgentRadios.forEach(function(radio) {
-                                    radio.checked = (radio.value == (task.is_urgent || '0'));
-                                });
-
-                            } else {
-                                alert('加载任务数据失败: ' + (response.msg || '未知错误'));
-                            }
-                        } catch (e) {
-                            alert('加载任务数据失败，服务器响应格式错误');
-                        }
-                    } else {
-                        alert('加载任务数据失败，网络错误');
-                    }
-                }
-            };
-
-            xhr.onerror = function() {
-                alert('加载任务数据失败，网络请求失败');
-            };
-
-            xhr.send('action=get_task&task_id=' + taskId);
-        } else {
-            // 新增任务，清空表单
-            document.getElementById('task-form').reset();
-            document.querySelector('input[name="task_id"]').value = '';
-        }
+    function openAddTaskModal() {
+        document.getElementById('add-task-modal').style.display = 'flex';
+        // 清空新建表单
+        document.getElementById('add-task-form').reset();
     }
 
-    function closeTaskModal() {
-        document.getElementById('task-modal').style.display = 'none';
+    function closeAddTaskModal() {
+        document.getElementById('add-task-modal').style.display = 'none';
+    }
+
+    function openEditTaskModal(taskId) {
+        document.getElementById('edit-task-modal').style.display = 'flex';
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', 'modules/patent_management/edit_patent.php', true);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        if (response.success) {
+                            var task = response.data;
+
+                            // 安全地设置字段值的函数（针对编辑表单）
+                            function setEditFieldValue(selector, value) {
+                                var element = document.querySelector('#edit-task-form ' + selector);
+                                if (element) {
+                                    element.value = value || '';
+                                }
+                            }
+
+                            // 填充基本字段
+                            setEditFieldValue('input[name="task_id"]', task.id);
+                            setEditFieldValue('input[name="task_item"]', task.task_item);
+                            setEditFieldValue('input[name="case_stage"]', task.case_stage);
+                            setEditFieldValue('select[name="task_status"]', task.task_status);
+                            setEditFieldValue('select[name="task_rule_count"]', task.task_rule_count);
+                            setEditFieldValue('input[name="internal_deadline"]', task.internal_deadline);
+                            setEditFieldValue('input[name="client_deadline"]', task.client_deadline);
+                            setEditFieldValue('input[name="official_deadline"]', task.official_deadline);
+                            setEditFieldValue('input[name="first_draft_date"]', task.first_draft_date);
+                            setEditFieldValue('input[name="final_draft_date"]', task.final_draft_date);
+                            setEditFieldValue('input[name="return_date"]', task.return_date);
+                            setEditFieldValue('input[name="completion_date"]', task.completion_date);
+                            setEditFieldValue('input[name="send_to_firm_date"]', task.send_to_firm_date);
+                            setEditFieldValue('input[name="internal_final_date"]', task.internal_final_date);
+                            setEditFieldValue('input[name="translation_word_count"]', task.translation_word_count);
+                            setEditFieldValue('input[name="contract_number"]', task.contract_number);
+                            setEditFieldValue('textarea[name="remarks"]', task.remarks);
+
+                            // 处理下拉搜索框 - 使用查询返回的用户名称
+                            if (task.handler_id) {
+                                setEditFieldValue('input[name="handler_id"]', task.handler_id);
+                                setEditFieldValue('input[name="handler_id_display"]', task.handler_name || '');
+                            }
+                            if (task.external_handler_id) {
+                                setEditFieldValue('input[name="external_handler_id"]', task.external_handler_id);
+                                setEditFieldValue('input[name="external_handler_id_display"]', task.external_handler_name || '');
+                            }
+                            if (task.supervisor_id) {
+                                setEditFieldValue('input[name="supervisor_id"]', task.supervisor_id);
+                                setEditFieldValue('input[name="supervisor_id_display"]', task.supervisor_name || '');
+                            }
+
+                            // 处理单选框
+                            var urgentRadios = document.querySelectorAll('#edit-task-form input[name="is_urgent"]');
+                            urgentRadios.forEach(function(radio) {
+                                radio.checked = (radio.value == (task.is_urgent || '0'));
+                            });
+
+                            // 绑定文件上传功能
+                            bindTaskFileUpload(task.id);
+
+                        } else {
+                            alert('加载任务数据失败: ' + (response.msg || '未知错误'));
+                        }
+                    } catch (e) {
+                        alert('加载任务数据失败，服务器响应格式错误');
+                    }
+                } else {
+                    alert('加载任务数据失败，网络错误');
+                }
+            }
+        };
+
+        xhr.onerror = function() {
+            alert('加载任务数据失败，网络请求失败');
+        };
+
+        xhr.send('action=get_task&task_id=' + taskId);
+    }
+
+    function closeEditTaskModal() {
+        document.getElementById('edit-task-modal').style.display = 'none';
     }
 
     function editTask(taskId) {
-        openTaskModal(taskId);
+        openEditTaskModal(taskId);
     }
 
     function deleteTask(taskId) {
@@ -675,8 +858,8 @@ render_select_search_assets();
         xhr.send('action=delete_task&task_id=' + taskId);
     }
 
-    // 表单提交处理
-    document.getElementById('task-form').onsubmit = function(e) {
+    // 新建表单提交处理
+    document.getElementById('add-task-form').onsubmit = function(e) {
         e.preventDefault();
 
         var formData = new FormData(this);
@@ -691,7 +874,44 @@ render_select_search_assets();
                         var response = JSON.parse(xhr.responseText);
                         if (response.success) {
                             alert('保存成功');
-                            closeTaskModal();
+                            closeAddTaskModal();
+                            loadTaskList();
+                        } else {
+                            alert('保存失败: ' + (response.msg || '未知错误'));
+                        }
+                    } catch (e) {
+                        alert('保存失败，服务器响应格式错误');
+                    }
+                } else {
+                    alert('保存失败，网络错误');
+                }
+            }
+        };
+
+        xhr.onerror = function() {
+            alert('保存失败，网络请求失败');
+        };
+
+        xhr.send(formData);
+    };
+
+    // 编辑表单提交处理
+    document.getElementById('edit-task-form').onsubmit = function(e) {
+        e.preventDefault();
+
+        var formData = new FormData(this);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', 'modules/patent_management/edit_patent.php', true);
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        if (response.success) {
+                            alert('保存成功');
+                            closeEditTaskModal();
                             loadTaskList();
                         } else {
                             alert('保存失败: ' + (response.msg || '未知错误'));
@@ -741,8 +961,18 @@ render_select_search_assets();
             // 获取当前tab的ID（专利编辑tab）
             var currentTabId = getCurrentTabId();
 
-            // 打开专利查询页面（专利管理-案件管理-专利查询）
-            window.parent.openTab(1, 5, 0);
+            // 获取来源页面信息，如果没有则默认返回专利查询页面
+            var sourceModule = sessionStorage.getItem('patent_edit_source_module') || '1';
+            var sourceMenu = sessionStorage.getItem('patent_edit_source_menu') || '5';
+            var sourceSubMenu = sessionStorage.getItem('patent_edit_source_submenu') || '0';
+
+            // 清除来源页面信息
+            sessionStorage.removeItem('patent_edit_source_module');
+            sessionStorage.removeItem('patent_edit_source_menu');
+            sessionStorage.removeItem('patent_edit_source_submenu');
+
+            // 根据来源页面返回到对应页面
+            window.parent.openTab(parseInt(sourceModule), parseInt(sourceMenu), sourceSubMenu === 'null' ? null : parseInt(sourceSubMenu));
 
             // 关闭当前的专利编辑tab
             if (currentTabId) {
@@ -758,5 +988,261 @@ render_select_search_assets();
     function getCurrentTabId() {
         // 专利编辑tab的ID格式：1_6_null（专利管理-专利编辑-无子菜单）
         return '1_6_n';
+    }
+
+    // 获取下载文件名，确保包含正确的扩展名
+    function getDownloadFileName(customName, originalName) {
+        // 如果没有自定义文件名，使用原文件名
+        if (!customName || customName.trim() === '') {
+            return originalName || '未知文件';
+        }
+
+        // 如果没有原文件名，直接返回自定义文件名
+        if (!originalName || originalName.trim() === '') {
+            return customName;
+        }
+
+        // 获取原文件的扩展名
+        var originalExt = '';
+        var dotIndex = originalName.lastIndexOf('.');
+        if (dotIndex > 0 && dotIndex < originalName.length - 1) {
+            originalExt = originalName.substring(dotIndex);
+        }
+
+        // 检查自定义文件名是否已有扩展名
+        var customDotIndex = customName.lastIndexOf('.');
+        var hasCustomExt = customDotIndex > 0 && customDotIndex < customName.length - 1;
+
+        // 如果自定义文件名没有扩展名，且原文件有扩展名，则补上扩展名
+        if (!hasCustomExt && originalExt) {
+            return customName + originalExt;
+        }
+
+        // 否则直接返回自定义文件名
+        return customName;
+    }
+
+    // 文件上传/删除/回显逻辑（复制自申请人列表页面）
+    function renderTaskFileList(taskId, fileType, listDivId) {
+        var listDiv = document.getElementById(listDivId);
+        listDiv.innerHTML = '加载中...';
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', 'modules/patent_management/task_file_upload.php?action=list&task_id=' + taskId + '&file_type=' + encodeURIComponent(fileType), true);
+        xhr.onload = function() {
+            try {
+                var res = JSON.parse(xhr.responseText);
+                if (res.success && res.files.length > 0) {
+                    var html = '<table class="module-table" style="margin:0;width:100%;border-collapse:collapse;"><thead><tr>' +
+                        '<th style="width:180px;border:1px solid #e0e0e0;">文件名</th>' +
+                        '<th style="width:180px;border:1px solid #e0e0e0;">原文件名</th>' +
+                        '<th style="width:140px;border:1px solid #e0e0e0;">上传时间</th>' +
+                        '<th style="width:120px;border:1px solid #e0e0e0;">操作</th>' +
+                        '</tr></thead><tbody>';
+                    res.files.forEach(function(f) {
+                        // 确定下载文件名：优先使用用户自定义文件名，否则使用原文件名
+                        var downloadName = getDownloadFileName(f.file_name, f.original_file_name);
+                        html += '<tr>' +
+                            '<td style="border:1px solid #e0e0e0;">' + (f.file_name || '') + '</td>' +
+                            '<td style="border:1px solid #e0e0e0;">' + (f.original_file_name || f.file_name || '') + '</td>' +
+                            '<td style="border:1px solid #e0e0e0;">' + (f.created_at ? f.created_at.substr(0, 16) : '') + '</td>' +
+                            '<td style="border:1px solid #e0e0e0;white-space:nowrap;">' +
+                            '<a href="' + f.file_path + '" download="' + downloadName + '" class="btn-mini" style="margin-right:8px;">下载</a>' +
+                            '<button type="button" class="btn-mini file-del" data-id="' + f.id + '" style="color:#f44336;">删除</button>' +
+                            '</td>' +
+                            '</tr>';
+                    });
+                    html += '</tbody></table>';
+                    listDiv.innerHTML = html;
+                    listDiv.querySelectorAll('.file-del').forEach(function(btn) {
+                        btn.onclick = function(e) {
+                            e.preventDefault();
+                            if (!confirm('确定删除该文件？')) return;
+                            var id = this.getAttribute('data-id');
+                            var xhr2 = new XMLHttpRequest();
+                            var fd = new FormData();
+                            fd.append('action', 'delete');
+                            fd.append('id', id);
+                            xhr2.open('POST', 'modules/patent_management/task_file_upload.php', true);
+                            xhr2.onload = function() {
+                                renderTaskFileList(taskId, fileType, listDivId);
+                            };
+                            xhr2.send(fd);
+                        };
+                    });
+                } else {
+                    listDiv.innerHTML = '<span style="color:#888;">暂无文件</span>';
+                }
+            } catch (e) {
+                listDiv.innerHTML = '<span style="color:#888;">加载失败</span>';
+            }
+        };
+        xhr.onerror = function(e) {
+            listDiv.innerHTML = '<span style="color:#888;">加载失败</span>';
+        };
+        xhr.send();
+    }
+
+    function bindTaskFileUpload(taskId) {
+        // 先解绑旧事件，防止重复绑定
+        var btnApplication = document.getElementById('btn-upload-application');
+        var btnSpecification = document.getElementById('btn-upload-specification');
+        var btnClaims = document.getElementById('btn-upload-claims');
+        var btnDrawings = document.getElementById('btn-upload-drawings');
+        var btnOther = document.getElementById('btn-upload-other');
+        if (btnApplication) btnApplication.onclick = null;
+        if (btnSpecification) btnSpecification.onclick = null;
+        if (btnClaims) btnClaims.onclick = null;
+        if (btnDrawings) btnDrawings.onclick = null;
+        if (btnOther) btnOther.onclick = null;
+
+        // 申请书
+        document.getElementById('btn-upload-application').onclick = function() {
+            var fileInput = document.getElementById('file-application');
+            var nameInput = document.getElementById('file-name-application');
+            if (!fileInput.files[0]) {
+                alert('请选择文件');
+                return;
+            }
+            var fd = new FormData();
+            fd.append('action', 'upload');
+            fd.append('task_id', taskId);
+            fd.append('file_type', '申请书');
+            fd.append('file', fileInput.files[0]);
+            fd.append('file_name', nameInput ? nameInput.value : '');
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'modules/patent_management/task_file_upload.php', true);
+            xhr.onload = function() {
+                fileInput.value = '';
+                if (nameInput) nameInput.value = '';
+                renderTaskFileList(taskId, '申请书', 'list-application');
+            };
+            xhr.onerror = function(e) {
+                alert('上传失败');
+            };
+            xhr.send(fd);
+        };
+
+        // 说明书
+        document.getElementById('btn-upload-specification').onclick = function() {
+            var fileInput = document.getElementById('file-specification');
+            var nameInput = document.getElementById('file-name-specification');
+            if (!fileInput.files[0]) {
+                alert('请选择文件');
+                return;
+            }
+            var fd = new FormData();
+            fd.append('action', 'upload');
+            fd.append('task_id', taskId);
+            fd.append('file_type', '说明书');
+            fd.append('file', fileInput.files[0]);
+            fd.append('file_name', nameInput ? nameInput.value : '');
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'modules/patent_management/task_file_upload.php', true);
+            xhr.onload = function() {
+                fileInput.value = '';
+                if (nameInput) nameInput.value = '';
+                renderTaskFileList(taskId, '说明书', 'list-specification');
+            };
+            xhr.onerror = function(e) {
+                alert('上传失败');
+            };
+            xhr.send(fd);
+        };
+
+        // 权利要求书
+        document.getElementById('btn-upload-claims').onclick = function() {
+            var fileInput = document.getElementById('file-claims');
+            var nameInput = document.getElementById('file-name-claims');
+            if (!fileInput.files[0]) {
+                alert('请选择文件');
+                return;
+            }
+            var fd = new FormData();
+            fd.append('action', 'upload');
+            fd.append('task_id', taskId);
+            fd.append('file_type', '权利要求书');
+            fd.append('file', fileInput.files[0]);
+            fd.append('file_name', nameInput ? nameInput.value : '');
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'modules/patent_management/task_file_upload.php', true);
+            xhr.onload = function() {
+                fileInput.value = '';
+                if (nameInput) nameInput.value = '';
+                renderTaskFileList(taskId, '权利要求书', 'list-claims');
+            };
+            xhr.onerror = function(e) {
+                alert('上传失败');
+            };
+            xhr.send(fd);
+        };
+
+        // 附图
+        document.getElementById('btn-upload-drawings').onclick = function() {
+            var fileInput = document.getElementById('file-drawings');
+            var nameInput = document.getElementById('file-name-drawings');
+            if (!fileInput.files[0]) {
+                alert('请选择文件');
+                return;
+            }
+            var fd = new FormData();
+            fd.append('action', 'upload');
+            fd.append('task_id', taskId);
+            fd.append('file_type', '附图');
+            fd.append('file', fileInput.files[0]);
+            fd.append('file_name', nameInput ? nameInput.value : '');
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'modules/patent_management/task_file_upload.php', true);
+            xhr.onload = function() {
+                fileInput.value = '';
+                if (nameInput) nameInput.value = '';
+                renderTaskFileList(taskId, '附图', 'list-drawings');
+            };
+            xhr.onerror = function(e) {
+                alert('上传失败');
+            };
+            xhr.send(fd);
+        };
+
+        // 其他（多文件）
+        document.getElementById('btn-upload-other').onclick = function() {
+            var fileInput = document.getElementById('file-other');
+            var nameInput = document.getElementById('file-name-other');
+            if (!fileInput.files.length) {
+                alert('请选择文件');
+                return;
+            }
+            var files = Array.from(fileInput.files);
+            var uploadNext = function(idx) {
+                if (idx >= files.length) {
+                    fileInput.value = '';
+                    if (nameInput) nameInput.value = '';
+                    renderTaskFileList(taskId, '其他', 'list-other');
+                    return;
+                }
+                var fd = new FormData();
+                fd.append('action', 'upload');
+                fd.append('task_id', taskId);
+                fd.append('file_type', '其他');
+                fd.append('file', files[idx]);
+                fd.append('file_name', nameInput ? nameInput.value : '');
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', 'modules/patent_management/task_file_upload.php', true);
+                xhr.onload = function() {
+                    uploadNext(idx + 1);
+                };
+                xhr.onerror = function(e) {
+                    alert('上传失败');
+                };
+                xhr.send(fd);
+            };
+            uploadNext(0);
+        };
+
+        // 初始加载
+        renderTaskFileList(taskId, '申请书', 'list-application');
+        renderTaskFileList(taskId, '说明书', 'list-specification');
+        renderTaskFileList(taskId, '权利要求书', 'list-claims');
+        renderTaskFileList(taskId, '附图', 'list-drawings');
+        renderTaskFileList(taskId, '其他', 'list-other');
     }
 </script>

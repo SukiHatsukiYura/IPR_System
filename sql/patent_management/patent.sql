@@ -181,6 +181,7 @@ CREATE TABLE `patent_task_attachment` (
     `patent_case_info_id` INT(11) NOT NULL COMMENT '关联专利案件ID',
     `file_type` VARCHAR(50) NOT NULL COMMENT '文件类型（申请书/说明书/权利要求书/附图/其他）',
     `file_name` VARCHAR(200) NOT NULL COMMENT '文件名',
+    `original_file_name` VARCHAR(200) DEFAULT NULL COMMENT '原始文件名',
     `file_path` VARCHAR(300) NOT NULL COMMENT '文件存储路径',
     `file_size` BIGINT DEFAULT NULL COMMENT '文件大小（字节）',
     `mime_type` VARCHAR(100) DEFAULT NULL COMMENT '文件MIME类型',
@@ -427,3 +428,99 @@ CREATE TABLE `user_patent_follow_case_status` (
     CONSTRAINT `fk_patent_follow_case_status_user` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_patent_follow_case_status_case` FOREIGN KEY (`patent_case_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '用户专利关注案件状态表';
+
+-- 专利案件核稿状态表
+CREATE TABLE `patent_case_review_status` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `patent_case_info_id` INT(11) NOT NULL COMMENT '关联专利案件ID',
+    `patent_case_task_id` INT(11) NOT NULL COMMENT '关联处理事项ID',
+    `review_status` ENUM('草稿', '审核中', '已完成') DEFAULT '草稿' COMMENT '核稿状态',
+    `reviewer_id` INT(11) DEFAULT NULL COMMENT '核稿人ID，关联user表',
+    `review_comments` TEXT COMMENT '核稿意见',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_case_task` (`patent_case_info_id`, `patent_case_task_id`),
+    KEY `idx_patent_case_info_id` (`patent_case_info_id`),
+    KEY `idx_patent_case_task_id` (`patent_case_task_id`),
+    KEY `idx_review_status` (`review_status`),
+    KEY `idx_reviewer_id` (`reviewer_id`),
+    CONSTRAINT `fk_review_status_patent_case` FOREIGN KEY (`patent_case_info_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_review_status_patent_task` FOREIGN KEY (`patent_case_task_id`) REFERENCES `patent_case_task`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_review_status_reviewer` FOREIGN KEY (`reviewer_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '专利案件核稿状态表';
+
+-- 专利案件递交状态表
+CREATE TABLE `patent_case_submission_status` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `patent_case_info_id` INT(11) NOT NULL COMMENT '关联专利案件ID',
+    `patent_case_task_id` INT(11) NOT NULL COMMENT '关联处理事项ID',
+    `submission_status` ENUM('待处理', '审核中', '已完成') DEFAULT '待处理' COMMENT '递交状态',
+    `reviewer_id` INT(11) DEFAULT NULL COMMENT '核稿人ID，关联user表',
+    `review_comments` TEXT COMMENT '核稿意见',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_case_task` (`patent_case_info_id`, `patent_case_task_id`),
+    KEY `idx_patent_case_info_id` (`patent_case_info_id`),
+    KEY `idx_patent_case_task_id` (`patent_case_task_id`),
+    KEY `idx_submission_status` (`submission_status`),
+    KEY `idx_reviewer_id` (`reviewer_id`),
+    CONSTRAINT `fk_submission_status_patent_case` FOREIGN KEY (`patent_case_info_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_submission_status_patent_task` FOREIGN KEY (`patent_case_task_id`) REFERENCES `patent_case_task`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_submission_status_reviewer` FOREIGN KEY (`reviewer_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '专利案件递交状态表';
+
+-- 专利来文记录表
+CREATE TABLE `patent_incoming_document` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `patent_case_info_id` INT(11) NOT NULL COMMENT '关联专利案件ID',
+    `incoming_type` VARCHAR(100) NOT NULL COMMENT '来文类型（审查意见通知书/授权通知书/驳回决定/补正通知书/缴费通知书/年费缴费通知书/复审通知书/无效宣告通知书/专利证书/登记手续通知书/视为撤回通知书/恢复权利通知书/其他官方文件）',
+    `incoming_date` DATE NOT NULL COMMENT '来文日期',
+    `official_number` VARCHAR(100) DEFAULT NULL COMMENT '官方文号',
+    `deadline` DATE DEFAULT NULL COMMENT '期限日期',
+    `urgency` ENUM('普通', '紧急', '特急') DEFAULT '普通' COMMENT '紧急程度',
+    `status` ENUM('待处理', '处理中', '已处理', '已归档') DEFAULT '待处理' COMMENT '来文状态',
+    `handler_id` INT(11) DEFAULT NULL COMMENT '处理人ID，关联user表',
+    `content` TEXT COMMENT '来文内容',
+    `remarks` TEXT COMMENT '备注',
+    `creator_id` INT(11) DEFAULT NULL COMMENT '创建人ID，关联user表',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_patent_case_info_id` (`patent_case_info_id`),
+    KEY `idx_incoming_type` (`incoming_type`),
+    KEY `idx_incoming_date` (`incoming_date`),
+    KEY `idx_deadline` (`deadline`),
+    KEY `idx_status` (`status`),
+    KEY `idx_urgency` (`urgency`),
+    KEY `idx_handler_id` (`handler_id`),
+    KEY `idx_creator_id` (`creator_id`),
+    CONSTRAINT `fk_incoming_patent_case` FOREIGN KEY (`patent_case_info_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_incoming_handler` FOREIGN KEY (`handler_id`) REFERENCES `user`(`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_incoming_creator` FOREIGN KEY (`creator_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '专利来文记录表';
+
+-- 专利来文附件表
+CREATE TABLE `patent_incoming_document_file` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `patent_incoming_document_id` INT(11) NOT NULL COMMENT '关联专利来文记录ID',
+    `patent_case_info_id` INT(11) NOT NULL COMMENT '关联专利案件ID',
+    `file_type` VARCHAR(50) NOT NULL COMMENT '文件类型（官方文件/附件/其他）',
+    `file_name` VARCHAR(200) NOT NULL COMMENT '文件名',
+    `file_path` VARCHAR(300) NOT NULL COMMENT '文件存储路径',
+    `file_size` BIGINT DEFAULT NULL COMMENT '文件大小（字节）',
+    `mime_type` VARCHAR(100) DEFAULT NULL COMMENT '文件MIME类型',
+    `upload_user_id` INT(11) DEFAULT NULL COMMENT '上传人ID，关联user表',
+    `remarks` TEXT COMMENT '备注说明',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_patent_incoming_document_id` (`patent_incoming_document_id`),
+    KEY `idx_patent_case_info_id` (`patent_case_info_id`),
+    KEY `idx_file_type` (`file_type`),
+    KEY `idx_upload_user_id` (`upload_user_id`),
+    CONSTRAINT `fk_incoming_file_document` FOREIGN KEY (`patent_incoming_document_id`) REFERENCES `patent_incoming_document`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_incoming_file_patent_case` FOREIGN KEY (`patent_case_info_id`) REFERENCES `patent_case_info`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_incoming_file_upload_user` FOREIGN KEY (`upload_user_id`) REFERENCES `user`(`id`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '专利来文附件表';
